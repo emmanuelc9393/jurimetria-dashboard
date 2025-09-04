@@ -721,42 +721,7 @@ export function TabRelatorioPadrao() {
               </Card>
             </div>
 
-            {/* Heatmap */}
-            <Card>
-              <CardHeader>
-                <CardTitle>🔥 Mapa de Calor - Intensidade das Métricas</CardTitle>
-                <CardDescription>Visualização da intensidade de diferentes métricas ao longo do tempo</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <div className="inline-block min-w-full">
-                    <div className="grid grid-cols-1 gap-4">
-                      {['Produtividade', 'Conclusos', 'Entrada - Total', 'Baixados'].map(metrica => (
-                        <div key={metrica} className="space-y-2">
-                          <h4 className="font-medium text-sm">{metrica}</h4>
-                          <div className="flex gap-1 flex-wrap">
-                            {heatmapData
-                              .filter(d => d.metric === metrica)
-                              .map((data, heatmapIndex) => (
-                                <HeatmapCell key={heatmapIndex} data={data} maxValue={Math.max(...heatmapData.filter(d => d.metric === metrica).map(d => d.value))} />
-                              ))
-                            }
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-4 flex items-center gap-2 text-xs text-gray-600">
-                      <span>Baixa intensidade</span>
-                      <div className="w-4 h-4 bg-green-100 border border-gray-200 rounded"></div>
-                      <div className="w-4 h-4 bg-green-300 border border-gray-200 rounded"></div>
-                      <div className="w-4 h-4 bg-green-500 border border-gray-200 rounded"></div>
-                      <div className="w-4 h-4 bg-green-700 border border-gray-200 rounded"></div>
-                      <span>Alta intensidade</span>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+
             
             <Card>
               <CardHeader><CardTitle>Comparativo em Linhas</CardTitle></CardHeader>
