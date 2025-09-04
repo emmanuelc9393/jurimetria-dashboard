@@ -19,7 +19,11 @@ import { Calendar, Palette, Filter, Trash2, TrendingUp, TrendingDown, Sigma, Dot
 import { format, subMonths, subYears, startOfMonth, endOfMonth } from 'date-fns';
 
 const COLUNAS_ESPERADAS = [ 'Mês/Ano', 'Acervo total', 'Acervo em andamento', 'Conclusos', 'Conclusos - 100 dias', 'Conclusos + 365', 'Entradas - Casos novos', 'Entradas - Outras', 'Entrada - Total', 'Enviados Conclusos', 'Produtividade', 'Baixados' ];
-interface DadosLinha { 'Mês/Ano': string; Data: Date; [key: string]: string | number; }
+interface DadosLinha { 
+  'Mês/Ano': string; 
+  Data: Date; 
+  [key: string]: string | number | Date; // Added Date to the union type
+}
 interface Milestone { data: Date; desc: string; }
 const KpiCard = ({ title, value, change, changeText }: { title: string, value: string, change?: number, changeText?: string }) => ( <Card> <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">{title}</CardTitle></CardHeader> <CardContent> <div className="text-2xl font-bold">{value}</div> {change !== undefined && ( <p className="text-xs text-muted-foreground flex items-center"> <span className={`mr-1 flex items-center gap-1 ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}> {change >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />} {change.toFixed(1)}% </span> {changeText} </p> )} </CardContent> </Card> );
 
