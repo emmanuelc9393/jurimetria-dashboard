@@ -11,21 +11,25 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { LineChart, Line, BarChart, Bar, AreaChart, Area, ScatterChart, Scatter, XAxis, YAxis, Tooltip, Legend, CartesianGrid, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { LineChart, Line, BarChart, Bar, ScatterChart, Scatter, XAxis, YAxis, Tooltip, Legend, CartesianGrid, ResponsiveContainer, ReferenceLine } from 'recharts';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { loadRelatorioData, saveRelatorioData } from '@/app/actions';
 import { Calendar, Palette, Filter, Trash2, TrendingUp, TrendingDown, Sigma, Dot } from 'lucide-react';
 import { format, subMonths, subYears, startOfMonth, endOfMonth } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 
+// --- DEFINIÇÃO EXPLÍCITA DAS COLUNAS ESPERADAS ---
 const COLUNAS_ESPERADAS = [
   'Mês/Ano', 'Acervo total', 'Acervo em andamento', 'Conclusos', 'Conclusos - 100 dias', 
   'Conclusos + 365', 'Entradas - Casos novos', 'Entradas - Outras', 'Entrada - Total', 
   'Enviados Conclusos', 'Produtividade', 'Baixados'
 ];
-interface DadosLinha { 'Mês/Ano': string; Data: Date; [key: string]: any; }
+
+// --- TIPOS DE DADOS ---
+interface DadosLinha { 'Mês/Ano': string; Data: Date; [key: string]: string | number; }
 interface Milestone { data: Date; desc: string; }
+
+// --- COMPONENTE AUXILIAR ---
 const KpiCard = ({ title, value, change, changeText }: { title: string, value: string, change?: number, changeText?: string }) => (
   <Card>
     <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">{title}</CardTitle></CardHeader>
@@ -44,6 +48,7 @@ const KpiCard = ({ title, value, change, changeText }: { title: string, value: s
   </Card>
 );
 
+// --- COMPONENTE PRINCIPAL DA ABA ---
 export function TabRelatorioPadrao() {
   const [dados, setDados] = useState<DadosLinha[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -73,16 +78,15 @@ export function TabRelatorioPadrao() {
     fetchData();
   }, []);
 
-  const processarDadosCarregados = (dadosParaProcessar: any[]) => {
+  const processarDadosCarregados = (dadosParaProcessar: { [key: string]: string | number }[]) => {
     if (!dadosParaProcessar || dadosParaProcessar.length === 0) {
-      toast.warning("Nenhum dado válido encontrado para processar.");
-      return;
+      toast.warning("Nenhum dado válido encontrado para processar."); return;
     }
     const numericas = COLUNAS_ESPERADAS.filter(c => c !== 'Mês/Ano');
-    setColunasNumericas(numericas);
-    setMetricasSelecionadas(numericas.slice(0, 2));
+    setColunasNumericas(numericas); setMetricasSelecionadas(numericas.slice(0, 2));
     if (numericas.length >= 2) { setScatterX(numericas[0]); setScatterY(numericas[1]); }
     const mesesMap: { [key: string]: string } = { 'jan': '0', 'fev': '1', 'mar': '2', 'abr': '3', 'mai': '4', 'jun': '5', 'jul': '6', 'ago': '7', 'set': '8', 'out': '9', 'nov': '10', 'dez': '11' };
+    
     const dadosFormatados = dadosParaProcessar.map(linha => {
       try {
         const mesAnoStr = String(linha['Mês/Ano']).toLowerCase().trim();
@@ -91,17 +95,17 @@ export function TabRelatorioPadrao() {
         const anoStr = anoStrFull.length === 2 ? `20${anoStrFull}` : anoStrFull;
         const dataCompleta = new Date(parseInt(anoStr), parseInt(mesesMap[mesStr]), 1);
         if (isNaN(dataCompleta.getTime())) return null;
-        const linhaProcessada: any = { 'Mês/Ano': linha['Mês/Ano'], Data: dataCompleta };
+        const linhaProcessada: DadosLinha = { 'Mês/Ano': String(linha['Mês/Ano']), Data: dataCompleta };
         numericas.forEach(col => {
           const valor = linha[col];
           linhaProcessada[col] = typeof valor === 'string' ? Number(valor.replace(/[^0-9.,-]+/g, "").replace(",", ".")) || 0 : Number(valor) || 0;
         });
         return linhaProcessada;
       } catch { return null; }
-    }).filter(Boolean).sort((a,b) => a!.Data.getTime() - b!.Data.getTime());
+    }).filter((item): item is DadosLinha => item !== null).sort((a,b) => a.Data.getTime() - b.Data.getTime());
 
     if (dadosFormatados.length > 0) {
-      setDados(dadosFormatados as DadosLinha[]);
+      setDados(dadosFormatados);
       toast.success(`${dadosFormatados.length} linhas de dados processadas com sucesso!`);
     } else {
       toast.error("Nenhuma linha pôde ser processada.", { description: "Verifique se a coluna 'Mês/Ano' está no formato correto (ex: jan/21)." });
@@ -111,44 +115,107 @@ export function TabRelatorioPadrao() {
   const handleFileChangeXLSX = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]; if (!file) return; const reader = new FileReader();
     reader.onload = (e) => {
-      try { const data = new Uint8Array(e.target?.result as ArrayBuffer); const workbook = XLSX.read(data, { type: 'array' }); const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]) as any[]; processarDadosCarregados(json); } catch (error) { toast.error("Erro ao ler o arquivo XLSX."); }
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]) as { [key: string]: string | number }[];
+        processarDadosCarregados(json);
+      } catch { toast.error("Erro ao ler o arquivo XLSX."); }
     };
     reader.readAsArrayBuffer(file);
   };
   
   const handleProcessPastedData = () => {
-    if (!pastedData) return; const linhas = pastedData.trim().split('\n'); const cabecalho = linhas[0].split('\t'); const dadosJson = linhas.slice(1).map(linha => { const valores = linha.split('\t'); const obj: { [key: string]: any } = {}; cabecalho.forEach((key, index) => { obj[key.trim()] = valores[index]; }); return obj; }); processarDadosCarregados(dadosJson);
+    if (!pastedData) return;
+    const linhas = pastedData.trim().split('\n');
+    const cabecalho = linhas[0].split('\t');
+    const dadosJson = linhas.slice(1).map(linha => {
+      const valores = linha.split('\t');
+      const obj: { [key: string]: string } = {};
+      cabecalho.forEach((key, index) => { obj[key.trim()] = valores[index]; });
+      return obj;
+    });
+    processarDadosCarregados(dadosJson);
   };
 
   const handleSave = async () => {
-    const dadosParaSalvar = dados.map(({ Data, ...resto }) => resto); const result = await saveRelatorioData(dadosParaSalvar); if (result.success) toast.success("Dados salvos no banco de dados!"); else toast.error("Falha ao salvar os dados.", { description: result.error });
+    const dadosParaSalvar = dados.map(({ Data, ...resto }) => resto);
+    const result = await saveRelatorioData(dadosParaSalvar);
+    if (result.success) toast.success("Dados salvos no banco de dados!");
+    else toast.error("Falha ao salvar os dados.", { description: result.error });
   };
 
   const handleRowChange = (index: number, field: string, value: string) => {
-    const novosDados = dados.map((linha, idx) => { if (idx !== index) return linha; return { ...linha, [field]: field === 'Mês/Ano' ? value : Number(value) || 0 }; }); setDados(novosDados);
+    const novosDados = dados.map((linha, idx) => {
+      if (idx !== index) return linha;
+      return { ...linha, [field]: field === 'Mês/Ano' ? value : Number(value) || 0 };
+    });
+    setDados(novosDados);
   };
 
   const handleAddRow = () => {
-    const novaLinha: { [key: string]: any } = {}; COLUNAS_ESPERADAS.forEach(col => { novaLinha[col] = col === 'Mês/Ano' ? 'novo/ano' : 0; }); novaLinha['Data'] = new Date(); setDados([...dados, novaLinha]);
+    const novaLinha: { [key: string]: string | number | Date } = {};
+    COLUNAS_ESPERADAS.forEach(col => { novaLinha[col] = col === 'Mês/Ano' ? 'novo/ano' : 0; });
+    novaLinha['Data'] = new Date();
+    setDados([...dados, novaLinha as DadosLinha]);
   };
 
   const dadosFiltrados = useMemo(() => {
-    if (!dados) return []; const inicio = filtroDataInicio ? new Date(filtroDataInicio + "T00:00:00") : null; const fim = filtroDataFim ? new Date(filtroDataFim + "T00:00:00") : null; return dados.filter(d => { if (inicio && d.Data < inicio) return false; if (fim && d.Data > fim) return false; return true; });
+    if (!dados) return [];
+    const inicio = filtroDataInicio ? new Date(filtroDataInicio + "T00:00:00") : null;
+    const fim = filtroDataFim ? new Date(filtroDataFim + "T00:00:00") : null;
+    return dados.filter(d => { if (inicio && d.Data < inicio) return false; if (fim && d.Data > fim) return false; return true; });
   }, [dados, filtroDataInicio, filtroDataFim]);
 
   const analytics = useMemo(() => {
-    if (dadosFiltrados.length === 0) return null; const last = dadosFiltrados[dadosFiltrados.length - 1]; const first = dadosFiltrados[0]; const previous = dadosFiltrados.length > 1 ? dadosFiltrados[dadosFiltrados.length - 2] : null; const totalBaixados = dadosFiltrados.reduce((sum, d) => sum + (d['Baixados'] || 0), 0); const produtividadeMedia = dadosFiltrados.reduce((sum, d) => sum + (d['Produtividade'] || 0), 0) / dadosFiltrados.length; const variacaoAcervo = (last['Acervo total'] || 0) - (first['Acervo total'] || 0); const produtividadeChange = previous ? (((last['Produtividade'] || 0) - (previous['Produtividade'] || 0)) / (previous['Produtividade'] || 1)) * 100 : 0; const mesMaiorProdutividade = dadosFiltrados.reduce((max, d) => ((d['Produtividade'] || 0) > (max['Produtividade'] || 0) ? d : max), first); const statsTable = colunasNumericas.map(metrica => { const values = dadosFiltrados.map(d => d[metrica]).filter(v => typeof v === 'number'); if (values.length === 0) return { metrica, media: 0, mediana: 0, max: 0, min: 0 }; values.sort((a, b) => a - b); const sum = values.reduce((a, b) => a + b, 0); const mid = Math.floor(values.length / 2); const median = values.length % 2 === 0 ? (values[mid - 1] + values[mid]) / 2 : values[mid]; return { metrica, media: sum / values.length, mediana: median, max: Math.max(...values), min: Math.min(...values) }; }); const acervoInicial = first['Acervo total'] || 0; return { totalBaixados, produtividadeMedia, variacaoAcervo, produtividadeChange, mesMaiorProdutividade, statsTable, acervoInicial };
+    if (dadosFiltrados.length === 0) return null;
+    const last = dadosFiltrados[dadosFiltrados.length - 1];
+    const first = dadosFiltrados[0];
+    const previous = dadosFiltrados.length > 1 ? dadosFiltrados[dadosFiltrados.length - 2] : null;
+    const totalBaixados = dadosFiltrados.reduce((sum, d) => sum + Number(d['Baixados'] || 0), 0);
+    const produtividadeMedia = dadosFiltrados.reduce((sum, d) => sum + Number(d['Produtividade'] || 0), 0) / dadosFiltrados.length;
+    const variacaoAcervo = Number(last['Acervo total'] || 0) - Number(first['Acervo total'] || 0);
+    const produtividadeChange = previous ? ((Number(last['Produtividade'] || 0) - Number(previous['Produtividade'] || 0)) / (Number(previous['Produtividade']) || 1)) * 100 : 0;
+    const mesMaiorProdutividade = dadosFiltrados.reduce((max, d) => (Number(d['Produtividade'] || 0) > Number(max['Produtividade'] || 0) ? d : max), first);
+    const statsTable = colunasNumericas.map(metrica => {
+      const values = dadosFiltrados.map(d => Number(d[metrica])).filter(v => !isNaN(v));
+      if (values.length === 0) return { metrica, media: 0, mediana: 0, max: 0, min: 0 };
+      values.sort((a, b) => a - b);
+      const sum = values.reduce((a, b) => a + b, 0);
+      const mid = Math.floor(values.length / 2);
+      const median = values.length % 2 === 0 ? (values[mid - 1] + values[mid]) / 2 : values[mid];
+      return { metrica, media: sum / values.length, mediana: median, max: Math.max(...values), min: Math.min(...values) };
+    });
+    const acervoInicial = Number(first['Acervo total'] || 0);
+    return { totalBaixados, produtividadeMedia, variacaoAcervo, produtividadeChange, mesMaiorProdutividade, statsTable, acervoInicial };
   }, [dadosFiltrados, colunasNumericas]);
 
   const handleAddMilestone = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault(); const formData = new FormData(e.currentTarget); const desc = formData.get('desc') as string; const dataStr = formData.get('data') as string; if (desc && dataStr) { const data = new Date(dataStr + "T00:00:00"); setMilestones([...milestones, { data, desc }]); e.currentTarget.reset(); }
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const desc = formData.get('desc') as string;
+    const dataStr = formData.get('data') as string;
+    if (desc && dataStr) {
+      const data = new Date(dataStr + "T00:00:00");
+      setMilestones([...milestones, { data, desc }]);
+      e.currentTarget.reset();
+    }
   };
   const handleDeleteMilestone = (index: number) => setMilestones(milestones.filter((_, i) => i !== index));
 
   const handleSetPeriod = (period: string) => {
     const today = new Date(); let start: Date; let end: Date = today;
-    switch (period) { case 'last_month': start = startOfMonth(subMonths(today, 1)); end = endOfMonth(subMonths(today, 1)); break; case 'last_quarter': start = startOfMonth(subMonths(today, 3)); break; case 'last_semester': start = startOfMonth(subMonths(today, 6)); break; case 'last_year': start = subYears(today, 1); break; case 'last_3_years': start = subYears(today, 3); break; case 'all': if (dados.length === 0) return; start = dados[0].Data; end = dados[dados.length - 1].Data; break; default: start = today; }
-    setFiltroDataInicio(format(start, 'yyyy-MM-dd')); setFiltroDataFim(format(end, 'yyyy-MM-dd'));
+    switch (period) {
+      case 'last_month': start = startOfMonth(subMonths(today, 1)); end = endOfMonth(subMonths(today, 1)); break;
+      case 'last_quarter': start = startOfMonth(subMonths(today, 3)); break;
+      case 'last_semester': start = startOfMonth(subMonths(today, 6)); break;
+      case 'last_year': start = subYears(today, 1); break;
+      case 'last_3_years': start = subYears(today, 3); break;
+      case 'all': if (dados.length === 0) return; start = dados[0].Data; end = dados[dados.length - 1].Data; break;
+      default: start = today;
+    }
+    setFiltroDataInicio(format(start, 'yyyy-MM-dd'));
+    setFiltroDataFim(format(end, 'yyyy-MM-dd'));
   };
   
   if (isLoading) return <div>Carregando dados...</div>;
@@ -158,8 +225,12 @@ export function TabRelatorioPadrao() {
       <aside className="w-full lg:w-80 bg-white p-6 border rounded-lg h-fit sticky top-8">
         <div className="space-y-6">
           <div className="flex items-center justify-between"><h2 className="text-xl font-semibold">Controles</h2><Button onClick={handleSave}>Salvar Dados</Button></div>
-          <div><h3 className="font-semibold flex items-center gap-2 mb-3"><Calendar size={16}/> Filtrar Período</h3><div className="space-y-2"><Label htmlFor="data-inicio">De:</Label><Input id="data-inicio" type="date" value={filtroDataInicio} onChange={e => setFiltroDataInicio(e.target.value)} /><Label htmlFor="data-fim">Até:</Label><Input id="data-fim" type="date" value={filtroDataFim} onChange={e => setFiltroDataFim(e.target.value)} /></div>
-            {/* ===== ÁREA CORRIGIDA COM CSS GRID ===== */}
+          <div>
+            <h3 className="font-semibold flex items-center gap-2 mb-3"><Calendar size={16}/> Filtrar Período</h3>
+            <div className="space-y-2">
+              <Label htmlFor="data-inicio">De:</Label><Input id="data-inicio" type="date" value={filtroDataInicio} onChange={e => setFiltroDataInicio(e.target.value)} />
+              <Label htmlFor="data-fim">Até:</Label><Input id="data-fim" type="date" value={filtroDataFim} onChange={e => setFiltroDataFim(e.target.value)} />
+            </div>
             <div className="grid grid-cols-2 gap-2 mt-3">
               <Button size="sm" variant="outline" onClick={() => handleSetPeriod('last_month')}>Mês Passado</Button>
               <Button size="sm" variant="outline" onClick={() => handleSetPeriod('last_quarter')}>Últ. 3 meses</Button>
@@ -176,7 +247,6 @@ export function TabRelatorioPadrao() {
         </div>
       </aside>
       <main className="flex-1 space-y-6">
-        {/* ===== ACCORDION COLAPSADO POR PADRÃO ===== */}
         <Accordion type="single" collapsible className="w-full">
           <AccordionItem value="item-1">
             <AccordionTrigger>Gerenciamento e Entrada de Dados</AccordionTrigger>

@@ -42,14 +42,15 @@ export function TabJurimetria() {
   const [processos, setProcessos] = useState<Processo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Efeito para carregar dados do banco de dados na inicialização
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       const dadosSalvos = await loadJurimetriaData();
       if (dadosSalvos && dadosSalvos.length > 0) {
-        // Converte as strings de data salvas no JSON de volta para objetos Date
-        const dadosComDatas = dadosSalvos.map((p: any) => ({ ...p, Autuação: new Date(p.Autuação) }));
+        const dadosComDatas = dadosSalvos.map((p) => ({
+          ...p,
+          Autuação: new Date(p.Autuação as string),
+        })) as Processo[];
         setProcessos(dadosComDatas);
         toast.success("Dados de processos da última sessão carregados.");
       }
@@ -61,7 +62,6 @@ export function TabJurimetria() {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
@@ -69,15 +69,15 @@ export function TabJurimetria() {
         const workbook = XLSX.read(data, { type: 'array', cellDates: true });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        const json = XLSX.utils.sheet_to_json(worksheet) as any[];
+        const json = XLSX.utils.sheet_to_json(worksheet) as { [key: string]: string | number }[];
 
         const dadosProcessados: Processo[] = json.map(p => ({
           Processo: String(p.Processo),
           Eventos: Number(p.Eventos) || 0,
-          Procedimento: p.Procedimento || 'Não especificado',
-          Classe: p.Classe || 'Não especificada',
-          Assunto: p.Assunto || 'Não especificado',
-          'Tipo de Conclusão': p['Tipo de Conclusão'] || 'Não especificado',
+          Procedimento: String(p.Procedimento || 'Não especificado'),
+          Classe: String(p.Classe || 'Não especificada'),
+          Assunto: String(p.Assunto || 'Não especificado'),
+          'Tipo de Conclusão': String(p['Tipo de Conclusão'] || 'Não especificado'),
           'Dias Conclusos': Number(p['Dias Conclusos']) || 0,
           Autuação: p.Autuação instanceof Date ? p.Autuação : parse(String(p.Autuação || '01/01/1970'), 'dd/MM/yyyy', new Date()),
           'Dias em Tramitação': Number(p['Dias em Tramitação']) || 0,
@@ -85,7 +85,7 @@ export function TabJurimetria() {
         
         setProcessos(dadosProcessados);
         toast.success(`${dadosProcessados.length} processos carregados do arquivo.`);
-      } catch (error) {
+      } catch {
         toast.error("Erro ao ler o arquivo XLSX.", { description: "Verifique o formato e as colunas do arquivo." });
       }
     };
@@ -97,7 +97,7 @@ export function TabJurimetria() {
     if (result.success) {
       toast.success("Dados dos processos salvos no banco de dados!");
     } else {
-      toast.error("Falha ao salvar os dados.", { description: result.error });
+      toast.error("Falha ao salvar os dados.");
     }
   };
 
@@ -105,8 +105,6 @@ export function TabJurimetria() {
 
   const stats = useMemo(() => {
     if (processos.length === 0) return null;
-
-    // Cálculos antigos que já funcionavam
     const totalProcessos = processos.length;
     const mediaEventos = processos.reduce((sum, p) => sum + p.Eventos, 0) / totalProcessos;
     const conhecimentoCount = processos.filter(p => p.Procedimento === 'Conhecimento').length;
@@ -117,36 +115,16 @@ export function TabJurimetria() {
       return acc;
     }, {} as { [key: string]: number });
     const conclusaoData = Object.entries(conclusaoCounts).map(([name, value]) => ({ name, value }));
-    const faixasPrazo = {
-      '0-30 dias': processos.filter(p => p['Dias Conclusos'] <= 30).length,
-      '31-60 dias': processos.filter(p => p['Dias Conclusos'] > 30 && p['Dias Conclusos'] <= 60).length,
-      '61-90 dias': processos.filter(p => p['Dias Conclusos'] > 60 && p['Dias Conclusos'] <= 90).length,
-      '91-120 dias': processos.filter(p => p['Dias Conclusos'] > 90 && p['Dias Conclusos'] <= 120).length,
-      '120+ dias': processos.filter(p => p['Dias Conclusos'] > 120).length,
-    };
+    const faixasPrazo = { '0-30 dias': processos.filter(p => p['Dias Conclusos'] <= 30).length, '31-60 dias': processos.filter(p => p['Dias Conclusos'] > 30 && p['Dias Conclusos'] <= 60).length, '61-90 dias': processos.filter(p => p['Dias Conclusos'] > 60 && p['Dias Conclusos'] <= 90).length, '91-120 dias': processos.filter(p => p['Dias Conclusos'] > 90 && p['Dias Conclusos'] <= 120).length, '120+ dias': processos.filter(p => p['Dias Conclusos'] > 120).length, };
     const faixasPrazoData = Object.entries(faixasPrazo).map(([name, value]) => ({ name, value }));
-
-    // NOVAS ANÁLISES ADICIONADAS
-    const top5Classes = Object.entries(processos.reduce((acc, p) => {
-      acc[p.Classe] = (acc[p.Classe] || 0) + 1; return acc;
-    }, {} as {[key:string]:number})).sort((a,b) => b[1] - a[1]).slice(0, 5).map(([name, value]) => ({name, value}));
-
-    const top5Assuntos = Object.entries(processos.reduce((acc, p) => {
-      acc[p.Assunto] = (acc[p.Assunto] || 0) + 1; return acc;
-    }, {} as {[key:string]:number})).sort((a,b) => b[1] - a[1]).slice(0, 5).map(([name, value]) => ({name, value}));
-
-    const tempoMedioPorProcedimento = Object.entries(processos.reduce((acc, p) => {
-        if (!acc[p.Procedimento]) acc[p.Procedimento] = { totalDias: 0, count: 0 };
-        acc[p.Procedimento].totalDias += p['Dias em Tramitação'];
-        acc[p.Procedimento].count++;
-        return acc;
-    }, {} as {[key:string]:{totalDias: number, count: number}})).map(([name, data]) => ({ name, value: data.totalDias / data.count }));
-
+    const top5Classes = Object.entries(processos.reduce((acc, p) => { acc[p.Classe] = (acc[p.Classe] || 0) + 1; return acc; }, {} as {[key:string]:number})).sort((a,b) => b[1] - a[1]).slice(0, 5).map(([name, value]) => ({name, value}));
+    const top5Assuntos = Object.entries(processos.reduce((acc, p) => { acc[p.Assunto] = (acc[p.Assunto] || 0) + 1; return acc; }, {} as {[key:string]:number})).sort((a,b) => b[1] - a[1]).slice(0, 5).map(([name, value]) => ({name, value}));
+    const tempoMedioPorProcedimento = Object.entries(processos.reduce((acc, p) => { if (!acc[p.Procedimento]) acc[p.Procedimento] = { totalDias: 0, count: 0 }; acc[p.Procedimento].totalDias += p['Dias em Tramitação']; acc[p.Procedimento].count++; return acc; }, {} as {[key:string]:{totalDias: number, count: number}})).map(([name, data]) => ({ name, value: data.totalDias / data.count }));
     return { totalProcessos, mediaEventos, conhecimentoCount, execucaoCount, processoMaisAntigo, conclusaoData, faixasPrazoData, top5Classes, top5Assuntos, tempoMedioPorProcedimento };
   }, [processos]);
   
   const PrintStyles = () => ( <style jsx global>{`@media print { .no-print { display: none !important; } main { padding: 0 !important; } }`}</style> );
-
+  
   if (isLoading) return <div>Carregando dados dos processos...</div>;
 
   return (
@@ -154,8 +132,8 @@ export function TabJurimetria() {
       <PrintStyles />
       <Card className="no-print">
         <CardHeader>
-            <CardTitle>Gerenciamento de Dados de Processos</CardTitle>
-            <CardDescription>Carregue um novo arquivo XLSX para substituir os dados atuais ou analise os dados já salvos.</CardDescription>
+          <CardTitle>Gerenciamento de Dados de Processos</CardTitle>
+          <CardDescription>Carregue um novo arquivo XLSX para substituir os dados atuais ou analise os dados já salvos.</CardDescription>
         </CardHeader>
         <CardContent className="flex items-center gap-4">
           <Input type="file" accept=".xlsx, .xls" onChange={handleFileChange} className="max-w-xs"/>
@@ -166,7 +144,7 @@ export function TabJurimetria() {
 
       {!stats ? (
         <Card className="flex items-center justify-center py-12">
-            <p className="text-gray-500">Nenhum dado de processo carregado. Use o painel acima para começar.</p>
+          <p className="text-gray-500">Nenhum dado de processo carregado. Use o painel acima para começar.</p>
         </Card>
       ) : (
         <>
@@ -176,7 +154,6 @@ export function TabJurimetria() {
             <KpiCard title="Conhecimento/Execução" value={`${stats.conhecimentoCount} / ${stats.execucaoCount}`} icon={'⚖️'} />
             <KpiCard title="Processo Mais Antigo" value={`${stats.processoMaisAntigo} dias`} icon={'⏳'} />
           </div>
-          
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <CardHeader><CardTitle>Processos por Tipo de Conclusão</CardTitle></CardHeader>
@@ -196,7 +173,7 @@ export function TabJurimetria() {
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie data={stats.faixasPrazoData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label={(props) => `${props.name} (${(props.percent * 100).toFixed(0)}%)`}>
-                       {stats.faixasPrazoData.map((entry, index) => <Cell key={`cell-${index}`} fill={['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#FF0000'][index % 5]} />)}
+                       {stats.faixasPrazoData.map((_entry, index) => <Cell key={`cell-${index}`} fill={['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#FF0000'][index % 5]} />)}
                     </Pie>
                     <Tooltip />
                     <Legend />
@@ -205,9 +182,8 @@ export function TabJurimetria() {
               </CardContent>
             </Card>
           </div>
-
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-             <Card>
+             <Card className="lg:col-span-1">
               <CardHeader><CardTitle>Top 5 Classes Processuais</CardTitle></CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
@@ -218,7 +194,7 @@ export function TabJurimetria() {
                 </ResponsiveContainer>
               </CardContent>
             </Card>
-             <Card>
+             <Card className="lg:col-span-1">
               <CardHeader><CardTitle>Top 5 Assuntos</CardTitle></CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
@@ -229,7 +205,7 @@ export function TabJurimetria() {
                 </ResponsiveContainer>
               </CardContent>
             </Card>
-            <Card>
+            <Card className="lg:col-span-1">
               <CardHeader><CardTitle>Tempo Médio de Tramitação</CardTitle></CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
