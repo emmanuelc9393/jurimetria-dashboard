@@ -11,22 +11,7 @@ import { parse } from 'date-fns';
 import { toast } from 'sonner';
 import { loadJurimetriaData, saveJurimetriaData } from '@/app/actions';
 
-// --- DEFINIÇÃO DOS TIPOS DE DADOS ---
-// ===== CORREÇÃO DO ERRO DE TIPO =====
-// Adicionamos uma "assinatura de índice" para tornar o tipo 'Processo' compatível com 'DataRow'
-interface Processo {
-  Processo: string;
-  Eventos: number;
-  Procedimento: string;
-  Classe: string;
-  Assunto: string;
-  'Tipo de Conclusão': string;
-  'Dias Conclusos': number;
-  Autuação: Date;
-  'Dias em Tramitação': number;
-  [key: string]: string | number | Date; // Esta linha resolve o erro
-}
-
+interface Processo { Processo: string; Eventos: number; Procedimento: string; Classe: string; Assunto: string; 'Tipo de Conclusão': string; 'Dias Conclusos': number; Autuação: Date; 'Dias em Tramitação': number; }
 const KpiCard = ({ title, value, icon }: { title: string; value: string; icon: React.ReactNode }) => ( <Card> <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"> <CardTitle className="text-sm font-medium">{title}</CardTitle> <span className="text-gray-500">{icon}</span> </CardHeader> <CardContent> <div className="text-2xl font-bold">{value}</div> </CardContent> </Card> );
 
 export function TabJurimetria() {
@@ -38,10 +23,7 @@ export function TabJurimetria() {
       setIsLoading(true);
       const dadosSalvos = await loadJurimetriaData();
       if (dadosSalvos && dadosSalvos.length > 0) {
-        const dadosComDatas = dadosSalvos.map((p) => ({
-          ...p,
-          Autuação: new Date(p.Autuação as string),
-        })) as Processo[];
+        const dadosComDatas = dadosSalvos.map((p) => ({ ...p, Autuação: new Date(p.Autuação as string), })) as Processo[];
         setProcessos(dadosComDatas);
         toast.success("Dados de processos da última sessão carregados.");
       }
@@ -64,7 +46,14 @@ export function TabJurimetria() {
   };
 
   const handleSave = async () => {
-    const result = await saveJurimetriaData(processos);
+    // ===== CORREÇÃO DEFINITIVA DO ERRO DE TIPO =====
+    // Antes de salvar, convertemos o objeto Date para uma string ISO
+    const dadosParaSalvar = processos.map(p => ({
+      ...p,
+      Autuação: p.Autuação.toISOString(),
+    }));
+
+    const result = await saveJurimetriaData(dadosParaSalvar);
     if (result.success) { toast.success("Dados dos processos salvos no banco de dados!"); } else { toast.error("Falha ao salvar os dados."); }
   };
 
