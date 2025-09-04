@@ -671,8 +671,8 @@ export function TabRelatorioPadrao() {
                         fill="#8884d8"
                         dataKey="value"
                       >
-                        {pieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        {pieData.map((entry) => (
+                          <Cell key={`cell-${entry.name}`} fill={entry.fill} />
                         ))}
                       </Pie>
                       <Tooltip />
