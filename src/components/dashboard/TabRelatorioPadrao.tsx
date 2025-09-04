@@ -46,12 +46,22 @@ export function TabRelatorioPadrao() {
   const handleProcessPastedData = () => { if (!pastedData) return; const linhas = pastedData.trim().split('\n'); const cabecalho = linhas[0].split('\t'); const dadosJson = linhas.slice(1).map(linha => { const valores = linha.split('\t'); const obj: { [key: string]: string } = {}; cabecalho.forEach((key, index) => { obj[key.trim()] = valores[index]; }); return obj; }); processarDadosCarregados(dadosJson); };
   
   const handleSave = async () => {
-    // ===== CORREÇÃO DEFINITIVA DO WARNING: `_Data` is defined but never used. =====
-    // Usamos um comentário para desabilitar a regra do linter APENAS para esta linha.
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const dadosParaSalvar = dados.map(({ Data, ...resto }) => resto);
+    // Remove the Data property and ensure proper typing for saveRelatorioData
+    const dadosParaSalvar = dados.map(({ Data, ...resto }) => {
+      // Create a properly typed object without the Date property
+      const dadosLimpos: { [key: string]: string | number } = {};
+      Object.entries(resto).forEach(([key, value]) => {
+        // Ensure all values are either string or number
+        if (typeof value === 'string' || typeof value === 'number') {
+          dadosLimpos[key] = value;
+        }
+      });
+      return dadosLimpos;
+    });
+    
     const result = await saveRelatorioData(dadosParaSalvar);
-    if (result.success) toast.success("Dados salvos!"); else toast.error("Falha ao salvar.", { description: result.error });
+    if (result.success) toast.success("Dados salvos!"); 
+    else toast.error("Falha ao salvar.", { description: result.error });
   };
   
   const handleRowChange = (index: number, field: string, value: string) => { const novosDados = dados.map((linha, idx) => { if (idx !== index) return linha; return { ...linha, [field]: field === 'Mês/Ano' ? value : Number(value) || 0 }; }); setDados(novosDados); };
