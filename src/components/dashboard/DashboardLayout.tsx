@@ -33,7 +33,7 @@ export function DashboardLayout() {
 <h1 className="text-3xl font-bold text-gray-800 text-center">Relatório Jurimétrico</h1>
     <h2 className="text-lg font-medium text-gray-600 text-center">2ª Vara da Família e Órfãos da Comarca da Capital - Fórum Eduardo Luz - Florianópolis/SC</h2>
     <p className="text-sm text-gray-500 text-center">Criado por Emmanuel Araújo da Costa - v. 1.19</p>
-    <p className="text-sm text-gray-500 mt-2 text-">{updateInfo} text</p>
+    <p className="text-sm text-gray-500 mt-2 text-">{updateInfo}</p>
 </header>
       
       <Tabs defaultValue="relatorio-padrao" className="w-full">
