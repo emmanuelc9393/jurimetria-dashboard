@@ -13,7 +13,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { 
   LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, 
   ResponsiveContainer, ReferenceLine, PieChart, Pie, Cell, AreaChart, Area,
-  ScatterChart, Scatter, ComposedChart
+  ComposedChart
 } from 'recharts';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
@@ -303,7 +303,7 @@ const exportToHTML = (dados: DadosLinha[], analytics: AnalyticsData | null, filt
 
       <div class="footer">
         <p>Relatório gerado automaticamente pelo Sistema de Análise de Produtividade Judicial</p>
-        <p>Para imprimir este relatório como PDF, use Ctrl+P (Cmd+P no Mac) e selecione "Salvar como PDF"</p>
+        <p>Para imprimir este relatório como PDF, use Ctrl+P (Cmd+P no Mac) e selecione &quot;Salvar como PDF&quot;</p>
       </div>
 
       <script>
@@ -790,7 +790,7 @@ return (
             <Card>
               <CardHeader>
                 <CardTitle>Entrada de Dados do Relatório Padrão</CardTitle>
-                <CardDescription>Escolha um método para carregar ou editar os dados. Clique em 'Salvar' na sidebar para persistir.</CardDescription>
+                <CardDescription>Escolha um método para carregar ou editar os dados. Clique em &apos;Salvar&apos; na sidebar para persistir.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div>
