@@ -28,8 +28,6 @@ const COLUNAS_ESPERADAS = [
   'Enviados Conclusos', 'Produtividade', 'Baixados'
 ];
 
-const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff8042', '#0088FE', '#AB63FA', '#FFA500', '#EF553B', '#19D3F3', '#FF6692', '#4CAF50', '#FF9800'];
-
 interface DadosLinha { 
   'Mês/Ano': string; 
   Data: Date; 
@@ -70,6 +68,11 @@ interface HeatmapData {
   metric: string;
   value: number;
   normalizedValue: number;
+}
+
+interface PieLabelProps {
+  name?: string;
+  percent?: number;
 }
 
 const KpiCard = ({ title, value }: { title: string, value: string }) => (
@@ -666,7 +669,7 @@ export function TabRelatorioPadrao() {
                         cx="50%"
                         cy="50%"
                         labelLine={false}
-                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                        label={({ name, percent }: PieLabelProps) => `${name || 'N/A'}: ${((percent || 0) * 100).toFixed(0)}%`}
                         outerRadius={80}
                         fill="#8884d8"
                         dataKey="value"
@@ -691,7 +694,7 @@ export function TabRelatorioPadrao() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {funnelData.map((item, index) => (
+                    {funnelData.map((item) => (
                       <div key={item.name} className="relative">
                         <div className="flex justify-between items-center mb-1">
                           <span className="text-sm font-medium">{item.name}</span>
@@ -731,8 +734,8 @@ export function TabRelatorioPadrao() {
                           <div className="flex gap-1 flex-wrap">
                             {heatmapData
                               .filter(d => d.metric === metrica)
-                              .map((data, index) => (
-                                <HeatmapCell key={index} data={data} maxValue={Math.max(...heatmapData.filter(d => d.metric === metrica).map(d => d.value))} />
+                              .map((data, heatmapIndex) => (
+                                <HeatmapCell key={heatmapIndex} data={data} maxValue={Math.max(...heatmapData.filter(d => d.metric === metrica).map(d => d.value))} />
                               ))
                             }
                           </div>
@@ -765,9 +768,9 @@ export function TabRelatorioPadrao() {
                     {metricasSelecionadas.map(metrica => 
                       <Line key={metrica} type="monotone" dataKey={metrica} stroke={cores[metrica] || '#000000'} strokeWidth={2} />
                     )}
-                    {milestones.map((m, i) => 
+                    {milestones.map((m, milestoneIndex) => 
                       <ReferenceLine 
-                        key={i} 
+                        key={milestoneIndex} 
                         x={format(m.data, 'MMM/yy', { locale: ptBR }).toLowerCase()} 
                         stroke="red" 
                         label={{ value: m.desc, position: 'top', fill: 'red' }} 
