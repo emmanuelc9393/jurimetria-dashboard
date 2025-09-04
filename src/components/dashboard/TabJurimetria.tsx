@@ -69,19 +69,25 @@ export function TabJurimetria() {
         const workbook = XLSX.read(data, { type: 'array', cellDates: true });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        const json = XLSX.utils.sheet_to_json(worksheet) as { [key: string]: string | number }[];
+        // Corrigido para 'any[]' para evitar o erro de tipo do 'instanceof'
+        const json = XLSX.utils.sheet_to_json(worksheet) as any[];
 
-        const dadosProcessados: Processo[] = json.map(p => ({
-          Processo: String(p.Processo),
-          Eventos: Number(p.Eventos) || 0,
-          Procedimento: String(p.Procedimento || 'Não especificado'),
-          Classe: String(p.Classe || 'Não especificada'),
-          Assunto: String(p.Assunto || 'Não especificado'),
-          'Tipo de Conclusão': String(p['Tipo de Conclusão'] || 'Não especificado'),
-          'Dias Conclusos': Number(p['Dias Conclusos']) || 0,
-          Autuação: p.Autuação instanceof Date ? p.Autuação : parse(String(p.Autuação || '01/01/1970'), 'dd/MM/yyyy', new Date()),
-          'Dias em Tramitação': Number(p['Dias em Tramitação']) || 0,
-        })).filter(p => p.Processo);
+        const dadosProcessados: Processo[] = json.map(p => {
+            const autuacao = p.Autuação;
+            const autuacaoDate = autuacao instanceof Date ? autuacao : parse(String(autuacao || '01/01/1970'), 'dd/MM/yyyy', new Date());
+
+            return {
+              Processo: String(p.Processo || ''),
+              Eventos: Number(p.Eventos) || 0,
+              Procedimento: String(p.Procedimento || 'Não especificado'),
+              Classe: String(p.Classe || 'Não especificada'),
+              Assunto: String(p.Assunto || 'Não especificado'),
+              'Tipo de Conclusão': String(p['Tipo de Conclusão'] || 'Não especificado'),
+              'Dias Conclusos': Number(p['Dias Conclusos']) || 0,
+              Autuação: autuacaoDate,
+              'Dias em Tramitação': Number(p['Dias em Tramitação']) || 0,
+            };
+        }).filter(p => p.Processo);
         
         setProcessos(dadosProcessados);
         toast.success(`${dadosProcessados.length} processos carregados do arquivo.`);
