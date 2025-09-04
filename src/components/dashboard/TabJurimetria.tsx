@@ -11,7 +11,10 @@ import { parse } from 'date-fns';
 import { toast } from 'sonner';
 import { loadJurimetriaData, saveJurimetriaData } from '@/app/actions';
 
-interface Processo { Processo: string; Eventos: number; Procedimento: string; Classe: string; Assunto: string; 'Tipo de Conclusão': string; 'Dias Conclusos': number; Autuação: Date; 'Dias em Tramitação': number; }
+interface Processo {
+  Processo: string; Eventos: number; Procedimento: string; Classe: string; Assunto: string; 'Tipo de Conclusão': string; 'Dias Conclusos': number; Autuação: Date; 'Dias em Tramitação': number;
+  [key: string]: string | number | Date;
+}
 const KpiCard = ({ title, value, icon }: { title: string; value: string; icon: React.ReactNode }) => ( <Card> <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"> <CardTitle className="text-sm font-medium">{title}</CardTitle> <span className="text-gray-500">{icon}</span> </CardHeader> <CardContent> <div className="text-2xl font-bold">{value}</div> </CardContent> </Card> );
 
 export function TabJurimetria() {
@@ -46,13 +49,7 @@ export function TabJurimetria() {
   };
 
   const handleSave = async () => {
-    // ===== CORREÇÃO DEFINITIVA DO ERRO DE TIPO =====
-    // Antes de salvar, convertemos o objeto Date para uma string ISO
-    const dadosParaSalvar = processos.map(p => ({
-      ...p,
-      Autuação: p.Autuação.toISOString(),
-    }));
-
+    const dadosParaSalvar = processos.map(p => ({ ...p, Autuação: p.Autuação.toISOString(), }));
     const result = await saveJurimetriaData(dadosParaSalvar);
     if (result.success) { toast.success("Dados dos processos salvos no banco de dados!"); } else { toast.error("Falha ao salvar os dados."); }
   };
@@ -83,7 +80,15 @@ export function TabJurimetria() {
         stats && (
         <>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4"><KpiCard title="Total de Processos" value={stats.totalProcessos.toString()} icon={'#️⃣'} /><KpiCard title="Média de Eventos" value={stats.mediaEventos.toFixed(1)} icon={'⚡'} /><KpiCard title="Conhecimento/Execução" value={`${stats.conhecimentoCount} / ${stats.execucaoCount}`} icon={'⚖️'} /><KpiCard title="Processo Mais Antigo" value={`${stats.processoMaisAntigo} dias`} icon={'⏳'} /></div>
-          <div className="grid gap-4 md:grid-cols-2"><Card><CardHeader><CardTitle>Processos por Tipo de Conclusão</CardTitle></CardHeader><CardContent><ResponsiveContainer width="100%" height={300}><BarChart data={stats.conclusaoData} layout="vertical" margin={{ left: 30 }}><XAxis type="number" /><YAxis type="category" dataKey="name" width={100} interval={0} /><Tooltip cursor={{fill: 'rgba(230, 230, 230, 0.5)'}}/><Bar dataKey="value" fill="#8884d8" barSize={30} /></BarChart></ResponsiveContainer></CardContent></Card><Card><CardHeader><CardTitle>Processos por Faixa de Prazo</CardTitle></CardHeader><CardContent><ResponsiveContainer width="100%" height={300}><PieChart><Pie data={stats.faixasPrazoData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label={(props) => `${props.name} (${(props.percent * 100).toFixed(0)}%)`}>{stats.faixasPrazoData.map((_entry, index) => <Cell key={`cell-${index}`} fill={['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#FF0000'][index % 5]} />)}</Pie><Tooltip /><Legend /></PieChart></ResponsiveContainer></CardContent></Card></div>
+          <div className="grid gap-4 md:grid-cols-2"><Card><CardHeader><CardTitle>Processos por Tipo de Conclusão</CardTitle></CardHeader><CardContent><ResponsiveContainer width="100%" height={300}><BarChart data={stats.conclusaoData} layout="vertical" margin={{ left: 30 }}><XAxis type="number" /><YAxis type="category" dataKey="name" width={100} interval={0} /><Tooltip cursor={{fill: 'rgba(230, 230, 230, 0.5)'}}/><Bar dataKey="value" fill="#8884d8" barSize={30} /></BarChart></ResponsiveContainer></CardContent></Card><Card><CardHeader><CardTitle>Processos por Faixa de Prazo</CardTitle></CardHeader><CardContent><ResponsiveContainer width="100%" height={300}><PieChart>
+            {/* ===== CORREÇÃO DO ERRO DE TIPO: 'props.percent' is possibly 'undefined'. ===== */}
+            <Pie data={stats.faixasPrazoData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label={(props) => {
+              // Adicionamos uma verificação de segurança
+              if (props.percent === undefined) return '';
+              return `${props.name} (${(props.percent * 100).toFixed(0)}%)`;
+            }}>
+              {stats.faixasPrazoData.map((_entry, index) => <Cell key={`cell-${index}`} fill={['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#FF0000'][index % 5]} />)}
+            </Pie><Tooltip /><Legend /></PieChart></ResponsiveContainer></CardContent></Card></div>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"><Card className="lg:col-span-1"><CardHeader><CardTitle>Top 5 Classes Processuais</CardTitle></CardHeader><CardContent><ResponsiveContainer width="100%" height={300}><BarChart data={stats.top5Classes} layout="vertical" margin={{ left: 100 }}><XAxis type="number" /><YAxis type="category" dataKey="name" width={100} interval={0} tick={{ fontSize: 12 }}/><Tooltip /><Bar dataKey="value" fill="#82ca9d" /></BarChart></ResponsiveContainer></CardContent></Card><Card className="lg:col-span-1"><CardHeader><CardTitle>Top 5 Assuntos</CardTitle></CardHeader><CardContent><ResponsiveContainer width="100%" height={300}><BarChart data={stats.top5Assuntos} layout="vertical" margin={{ left: 100 }}><XAxis type="number" /><YAxis type="category" dataKey="name" width={100} interval={0} tick={{ fontSize: 12 }}/><Tooltip /><Bar dataKey="value" fill="#ffc658" /></BarChart></ResponsiveContainer></CardContent></Card><Card className="lg:col-span-1"><CardHeader><CardTitle>Tempo Médio de Tramitação</CardTitle></CardHeader><CardContent><ResponsiveContainer width="100%" height={300}><BarChart data={stats.tempoMedioPorProcedimento}><XAxis dataKey="name" /><YAxis /><Tooltip formatter={(value) => `${(value as number).toFixed(0)} dias`} /><Bar dataKey="value" fill="#ff8042" /></BarChart></ResponsiveContainer></CardContent></Card></div>
         </>
         )
