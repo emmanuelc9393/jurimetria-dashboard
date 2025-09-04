@@ -156,7 +156,10 @@ export function TabRelatorioPadrao() {
   const [isLoading, setIsLoading] = useState(true);
   const [colunasNumericas, setColunasNumericas] = useState<string[]>([]);
   const [metricasSelecionadas, setMetricasSelecionadas] = useState<string[]>([]);
-  const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [milestones, setMilestones] = useState<Milestone[]>([
+    { data: new Date('2024-10-01T00:00:00'), desc: 'Nova Gestão' },
+    { data: new Date('2025-01-27T00:00:00'), desc: 'HomeOffice' }
+  ]);
   const [filtroDataInicio, setFiltroDataInicio] = useState<string>('');
   const [filtroDataFim, setFiltroDataFim] = useState<string>('');
   const [pastedData, setPastedData] = useState<string>('');
