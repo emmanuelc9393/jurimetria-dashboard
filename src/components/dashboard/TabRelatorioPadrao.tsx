@@ -22,13 +22,6 @@ import {
 import { format, subMonths, subYears, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-const COLUNAS_ESPERADAS = [
-  'ID', 'Data/Hora', 'Vara', 'Período',
-  'Acervo Início', 'Acervo Final', 'Conclusos Gab.', 'And. Cartório', 'Concl. +120',
-  'Concl. +365', 'And. Final', 'Produção', '% Julg. Acervo', '% Julg. Entrada',
-  '1ª Baixa CNJ', 'Entradas Novos', 'Outras Entradas', 'Baixados Def.', 'Outras Baixas',
-  'IAD', 'Taxa Congest.', 'Taxa Demanda', 'Taxa Redução', 'Status'
-];
 
 const COLUNAS_NUMERICAS_ESPERADAS = [
   'Acervo Início', 'Acervo Final', 'Conclusos Gab.', 'And. Cartório', 'Concl. +120',
@@ -399,7 +392,6 @@ export function TabRelatorioPadrao({ refreshKey = 0 }: { refreshKey?: number }) 
       setIsLoading(false);
     };
     fetchData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey]);
 
   const processarDadosCarregados = (dadosParaProcessar: { [key: string]: string | number }[]) => {
