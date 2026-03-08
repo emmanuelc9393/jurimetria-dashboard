@@ -1,7 +1,12 @@
 // src/app/actions.ts
 'use server';
 
-import { kv } from '@vercel/kv';
+import { createClient } from '@vercel/kv';
+
+const kv = createClient({
+  url: process.env.jurimetria_KV_REST_API_URL!,
+  token: process.env.jurimetria_KV_REST_API_TOKEN!,
+});
 
 // Criamos um tipo para nossos dados para evitar o uso de 'any'
 type DataRow = { [key: string]: string | number };
