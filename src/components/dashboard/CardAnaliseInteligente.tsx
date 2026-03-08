@@ -271,7 +271,7 @@ export function CardAnaliseInteligente({ historicoRaw }: { historicoRaw: DataRow
           {insights.length === 0 && (
             <p className="text-sm text-gray-500">
               Dados insuficientes para gerar análise. Importe o histórico de snapshots na aba
-              "Gerenciamento e Entrada de Dados".
+              &quot;Gerenciamento e Entrada de Dados&quot;.
             </p>
           )}
         </div>
