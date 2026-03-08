@@ -122,14 +122,22 @@
 }
 
 @media print {
+  /* Modo paisagem */
+  @page { size: landscape; margin: 1cm; }
+
   /* Esconder navegação e controles */
   .no-print { display: none !important; }
   [role="tablist"] { display: none !important; }
 
-  /* Mostrar todo conteúdo das abas (Radix UI mantém no DOM) */
-  [role="tabpanel"] {
+  /* Mostrar todo conteúdo das abas — inclusive sub-abas (Radix UI mantém no DOM) */
+  [role="tabpanel"],
+  [role="tabpanel"][data-state="inactive"],
+  [role="tabpanel"][hidden] {
     display: block !important;
     opacity: 1 !important;
+    visibility: visible !important;
+    height: auto !important;
+    overflow: visible !important;
   }
 
   /* Não mostrar aba de gerenciamento no PDF */
