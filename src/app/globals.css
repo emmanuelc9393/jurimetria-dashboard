@@ -120,3 +120,25 @@
     @apply bg-background text-foreground;
   }
 }
+
+@media print {
+  /* Esconder navegação e controles */
+  .no-print { display: none !important; }
+  [role="tablist"] { display: none !important; }
+
+  /* Mostrar todo conteúdo das abas (Radix UI mantém no DOM) */
+  [role="tabpanel"] {
+    display: block !important;
+    opacity: 1 !important;
+  }
+
+  /* Não mostrar aba de gerenciamento no PDF */
+  .print-hide { display: none !important; }
+
+  /* Quebra de página antes da seção de Análise de Processos */
+  .print-break-before { page-break-before: always; }
+
+  /* Remover fundo e padding excessivo */
+  body, .bg-gray-50 { background: white !important; }
+  .sticky { position: relative !important; }
+}

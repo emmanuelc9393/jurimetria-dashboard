@@ -55,11 +55,11 @@ export function DashboardLayout() {
           <TabRelatorioPadrao refreshKey={refreshKey} />
         </TabsContent>
 
-        <TabsContent value="jurimetria" className="mt-4">
+        <TabsContent value="jurimetria" className="mt-4 print-break-before">
           <TabJurimetria refreshKey={refreshKey} />
         </TabsContent>
 
-        <TabsContent value="gerenciamento" className="mt-4">
+        <TabsContent value="gerenciamento" className="mt-4 print-hide">
           <TabGerenciamento onDataSaved={handleDataSaved} />
         </TabsContent>
       </Tabs>
