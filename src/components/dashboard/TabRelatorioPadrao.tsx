@@ -702,7 +702,7 @@ if (isLoading) return <div>Carregando dados...</div>;
 
 return (
   <div className="flex flex-col lg:flex-row gap-6 overflow-x-hidden">
-    <aside className="no-print w-full lg:w-80 flex-shrink-0 bg-white p-6 border rounded-lg h-fit sticky top-8">
+    <aside className="no-print w-full lg:w-80 flex-shrink-0 bg-white p-6 border rounded-lg sticky top-4 self-start max-h-[calc(100vh-2rem)] overflow-y-auto">
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold">Controles</h2>
@@ -938,8 +938,6 @@ return (
                           data={acervoComposicaoData}
                           cx="50%"
                           cy="50%"
-                          labelLine={false}
-                          label={({ name, percent }: PieLabelProps) => `${name || 'N/A'}: ${((percent || 0) * 100).toFixed(1)}%`}
                           outerRadius={75}
                           dataKey="value"
                         >
@@ -948,6 +946,7 @@ return (
                           ))}
                         </Pie>
                         <Tooltip formatter={(value: number) => value.toLocaleString('pt-BR')} />
+                        <Legend />
                       </PieChart>
                     </ResponsiveContainer>
                     <div className="flex flex-col justify-center gap-3">
