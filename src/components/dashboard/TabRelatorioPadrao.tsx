@@ -68,10 +68,6 @@ interface HeatmapData {
   normalizedValue: number;
 }
 
-interface PieLabelProps {
-  name?: string;
-  percent?: number;
-}
 
 interface ProductivityComparison {
   currentMonth: number;
@@ -548,20 +544,6 @@ export function TabRelatorioPadrao({ refreshKey = 0 }: { refreshKey?: number }) 
       saldoLiquido: totals.entradas - totals.baixados,
       taxaResolucao: totals.entradas > 0 ? (totals.baixados / totals.entradas * 100) : 0
     };
-  }, [dadosFiltrados]);
-
-  // Dados para gráfico de pizza - Composição do Acervo
-  const pieData = useMemo(() => {
-    if (dadosFiltrados.length === 0) return [];
-
-    const ultimoPeriodo = dadosFiltrados[dadosFiltrados.length - 1];
-    return [
-      { name: 'And. Final', value: Number(ultimoPeriodo['And. Final']) || 0, fill: '#8884d8' },
-      { name: 'And. Cartório', value: Number(ultimoPeriodo['And. Cartório']) || 0, fill: '#AB63FA' },
-      { name: 'Conclusos Gab.', value: Number(ultimoPeriodo['Conclusos Gab.']) || 0, fill: '#82ca9d' },
-      { name: 'Concl. +120', value: Number(ultimoPeriodo['Concl. +120']) || 0, fill: '#ffc658' },
-      { name: 'Concl. +365', value: Number(ultimoPeriodo['Concl. +365']) || 0, fill: '#ff8042' },
-    ].filter(item => item.value > 0);
   }, [dadosFiltrados]);
 
   // Estatísticas do acervo para o card reformulado
