@@ -26,15 +26,26 @@ import { format, subMonths, subYears, startOfMonth, endOfMonth } from 'date-fns'
 import { ptBR } from 'date-fns/locale';
 
 const COLUNAS_ESPERADAS = [
-  'Mês/Ano', 'Acervo total', 'Acervo em andamento', 'Conclusos', 'Conclusos - 100 dias', 
-  'Conclusos + 365', 'Entradas - Casos novos', 'Entradas - Outras', 'Entrada - Total', 
-  'Enviados Conclusos', 'Produtividade', 'Baixados'
+  'ID', 'Data/Hora', 'Vara', 'Período',
+  'Acervo Início', 'Acervo Final', 'Conclusos Gab.', 'And. Cartório', 'Concl. +120',
+  'Concl. +365', 'And. Final', 'Produção', '% Julg. Acervo', '% Julg. Entrada',
+  '1ª Baixa CNJ', 'Entradas Novos', 'Outras Entradas', 'Baixados Def.', 'Outras Baixas',
+  'IAD', 'Taxa Congest.', 'Taxa Demanda', 'Taxa Redução', 'Status'
 ];
 
-interface DadosLinha { 
-  'Mês/Ano': string; 
-  Data: Date; 
-  [key: string]: string | number | Date; 
+const COLUNAS_NUMERICAS_ESPERADAS = [
+  'Acervo Início', 'Acervo Final', 'Conclusos Gab.', 'And. Cartório', 'Concl. +120',
+  'Concl. +365', 'And. Final', 'Produção', '% Julg. Acervo', '% Julg. Entrada',
+  '1ª Baixa CNJ', 'Entradas Novos', 'Outras Entradas', 'Baixados Def.', 'Outras Baixas',
+  'IAD', 'Taxa Congest.', 'Taxa Demanda', 'Taxa Redução'
+];
+
+const COLUNAS_OCULTAS_PADRAO = ['ID', 'Data/Hora', 'Vara', 'Status'];
+
+interface DadosLinha {
+  'Período': string;
+  Data: Date;
+  [key: string]: string | number | Date;
 }
 
 interface Milestone { 
@@ -255,7 +266,7 @@ const exportToHTML = (dados: DadosLinha[], analytics: AnalyticsData | null, filt
             </tr>
           </thead>
           <tbody>
-            ${['Conclusos', 'Produtividade', 'Entrada - Total', 'Baixados', 'Acervo total']
+            ${['Conclusos Gab.', 'Produção', 'Acervo Final', 'Baixados Def.', 'IAD']
               .map(metrica => {
                 const stat = analytics.statsTable.find(s => s.metrica === metrica);
                 return stat ? `
@@ -278,10 +289,10 @@ const exportToHTML = (dados: DadosLinha[], analytics: AnalyticsData | null, filt
         <table class="data-table">
           <thead>
             <tr>
-              <th>Mês/Ano</th>
-              <th>Conclusos</th>
-              <th>Produtividade</th>
-              <th>Entrada Total</th>
+              <th>Período</th>
+              <th>Conclusos Gab.</th>
+              <th>Produção</th>
+              <th>Entradas Total</th>
               <th>Baixados</th>
               <th>Acervo Total</th>
             </tr>
@@ -289,12 +300,12 @@ const exportToHTML = (dados: DadosLinha[], analytics: AnalyticsData | null, filt
           <tbody>
             ${dadosParaRelatorio.map(linha => `
               <tr>
-                <td><strong>${linha['Mês/Ano']}</strong></td>
-                <td>${linha['Conclusos'] || 0}</td>
-                <td>${linha['Produtividade'] || 0}</td>
-                <td>${linha['Entrada - Total'] || 0}</td>
-                <td>${linha['Baixados'] || 0}</td>
-                <td>${linha['Acervo total'] || 0}</td>
+                <td><strong>${linha['Período']}</strong></td>
+                <td>${linha['Conclusos Gab.'] || 0}</td>
+                <td>${linha['Produção'] || 0}</td>
+                <td>${(Number(linha['Entradas Novos'] || 0) + Number(linha['Outras Entradas'] || 0)).toFixed(0)}</td>
+                <td>${linha['Baixados Def.'] || 0}</td>
+                <td>${linha['Acervo Final'] || 0}</td>
               </tr>
             `).join('')}
           </tbody>
@@ -347,9 +358,14 @@ export function TabRelatorioPadrao() {
   const [filtroDataInicio, setFiltroDataInicio] = useState<string>('');
   const [filtroDataFim, setFiltroDataFim] = useState<string>('');
   const [pastedData, setPastedData] = useState<string>('');
+  const [colunasOcultas, setColunasOcultas] = useState<string[]>(COLUNAS_OCULTAS_PADRAO);
   const [cores, setCores] = useState<{ [key: string]: string }>({
-    'Acervo total': '#8884d8', 'Produtividade': '#82ca9d', 'Baixados': '#ffc658', 'Conclusos': '#ff8042', 'Entrada - Total': '#0088FE',
-    'Acervo em andamento': '#AB63FA', 'Conclusos - 100 dias': '#FFA500', 'Conclusos + 365': '#EF553B', 'Entradas - Casos novos': '#19D3F3', 'Entradas - Outras': '#FF6692', 'Enviados Conclusos': '#4CAF50'
+    'Acervo Início': '#8884d8', 'Acervo Final': '#AB63FA', 'Conclusos Gab.': '#ff8042',
+    'And. Cartório': '#FFA500', 'Concl. +120': '#EF553B', 'Concl. +365': '#FF6692',
+    'And. Final': '#9b59b6', 'Produção': '#82ca9d', '% Julg. Acervo': '#0088FE',
+    '% Julg. Entrada': '#19D3F3', '1ª Baixa CNJ': '#4CAF50', 'Entradas Novos': '#ffc658',
+    'Outras Entradas': '#f39c12', 'Baixados Def.': '#e74c3c', 'Outras Baixas': '#c0392b',
+    'IAD': '#1abc9c', 'Taxa Congest.': '#3498db', 'Taxa Demanda': '#2ecc71', 'Taxa Redução': '#e67e22'
   });
 
   useEffect(() => {
@@ -376,32 +392,51 @@ export function TabRelatorioPadrao() {
       toast.warning("Nenhum dado válido encontrado para processar.");
       return;
     }
-    const numericas = COLUNAS_ESPERADAS.filter(c => c !== 'Mês/Ano');
-    setColunasNumericas(numericas);
-    setMetricasSelecionadas(['Conclusos', 'Produtividade']);
+    setColunasNumericas(COLUNAS_NUMERICAS_ESPERADAS);
+    setMetricasSelecionadas(['Conclusos Gab.', 'Produção']);
     const mesesMap: { [key: string]: string } = { 'jan': '0', 'fev': '1', 'mar': '2', 'abr': '3', 'mai': '4', 'jun': '5', 'jul': '6', 'ago': '7', 'set': '8', 'out': '9', 'nov': '10', 'dez': '11' };
-    
+
+    const parsePeriodo = (valor: string | number): Date | null => {
+      const str = String(valor).toLowerCase().trim();
+      // formato jan/25 ou jan/2025
+      const partes = str.split('/');
+      if (partes.length === 2 && mesesMap[partes[0]] !== undefined) {
+        const anoStr = partes[1].length === 2 ? `20${partes[1]}` : partes[1];
+        const d = new Date(parseInt(anoStr), parseInt(mesesMap[partes[0]]), 1);
+        if (!isNaN(d.getTime())) return d;
+      }
+      // formato ISO ou outros
+      const d = new Date(valor as string);
+      if (!isNaN(d.getTime())) return d;
+      return null;
+    };
+
     const dadosFormatados = dadosParaProcessar.map(linha => {
       try {
-        const mesAnoStr = String(linha['Mês/Ano']).toLowerCase().trim();
-        const [mesStr, anoStrFull] = mesAnoStr.split('/');
-        if (!mesesMap[mesStr]) return null;
-        const anoStr = anoStrFull.length === 2 ? `20${anoStrFull}` : anoStrFull;
-        const dataCompleta = new Date(parseInt(anoStr), parseInt(mesesMap[mesStr]), 1);
-        if (isNaN(dataCompleta.getTime())) return null;
-        
-        const linhaProcessada: DadosLinha = { 
-          'Mês/Ano': String(linha['Mês/Ano']), 
-          Data: dataCompleta 
+        const periodoValor = linha['Período'];
+        if (periodoValor === undefined || periodoValor === null || String(periodoValor).trim() === '') return null;
+        const dataCompleta = parsePeriodo(periodoValor);
+        if (!dataCompleta) return null;
+
+        const linhaProcessada: DadosLinha = {
+          'Período': String(periodoValor),
+          Data: dataCompleta
         };
-        
-        numericas.forEach(col => {
+
+        // Colunas de texto não-numéricas (mantidas como string)
+        ['ID', 'Data/Hora', 'Vara', 'Status'].forEach(col => {
+          if (linha[col] !== undefined) linhaProcessada[col] = String(linha[col]);
+        });
+
+        COLUNAS_NUMERICAS_ESPERADAS.forEach(col => {
           const valor = linha[col];
-          linhaProcessada[col] = typeof valor === 'string' ? Number(valor.replace(/[^0-9.,-]+/g, "").replace(",", ".")) || 0 : Number(valor) || 0;
+          linhaProcessada[col] = typeof valor === 'string'
+            ? Number(valor.replace(/[^0-9.,-]+/g, "").replace(",", ".")) || 0
+            : Number(valor) || 0;
         });
         return linhaProcessada;
-      } catch { 
-        return null; 
+      } catch {
+        return null;
       }
     }).filter((item): item is DadosLinha => item !== null).sort((a,b) => a.Data.getTime() - b.Data.getTime());
 
@@ -409,7 +444,7 @@ export function TabRelatorioPadrao() {
       setDados(dadosFormatados);
       toast.success(`${dadosFormatados.length} linhas de dados processadas com sucesso!`);
     } else {
-      toast.error("Nenhuma linha pôde ser processada.", { description: "Verifique se a coluna 'Mês/Ano' está no formato correto (ex: jan/21)." });
+      toast.error("Nenhuma linha pôde ser processada.", { description: "Verifique se a coluna 'Período' está no formato correto (ex: jan/25)." });
     }
   };
   
@@ -466,31 +501,30 @@ export function TabRelatorioPadrao() {
   };
 
   const handleRowChange = (index: number, field: string, value: string) => {
-    const novosDados = dados.map((linha, idx) => { 
-      if (idx !== index) return linha; 
+    const novosDados = dados.map((linha, idx) => {
+      if (idx !== index) return linha;
       const updatedLine: DadosLinha = { ...linha };
-      if (field === 'Mês/Ano') {
+      const colsTexto = ['Período', 'ID', 'Data/Hora', 'Vara', 'Status'];
+      if (colsTexto.includes(field)) {
         updatedLine[field] = value;
       } else {
         updatedLine[field] = Number(value) || 0;
       }
       return updatedLine;
-    }); 
+    });
     setDados(novosDados);
   };
 
   const handleAddRow = () => {
     const novaLinha: DadosLinha = {
-      'Mês/Ano': 'novo/ano',
+      'Período': 'jan/25',
+      'ID': '',
+      'Data/Hora': '',
+      'Vara': '',
+      'Status': '',
       Data: new Date()
     };
-    
-    COLUNAS_ESPERADAS.forEach(col => { 
-      if (col !== 'Mês/Ano') {
-        novaLinha[col] = 0;
-      }
-    }); 
-    
+    COLUNAS_NUMERICAS_ESPERADAS.forEach(col => { novaLinha[col] = 0; });
     setDados([...dados, novaLinha]);
   };
 
@@ -508,11 +542,11 @@ export function TabRelatorioPadrao() {
   // Cálculo da comparação de produtividade melhorado
   const productivityComparison = useMemo((): ProductivityComparison | null => {
     if (dadosFiltrados.length === 0) return null;
-    
+
     const ultimoMes = dadosFiltrados[dadosFiltrados.length - 1];
-    const currentMonth = Number(ultimoMes['Produtividade']) || 0;
-    
-    const totalProdutividade = dadosFiltrados.reduce((sum, d) => sum + (Number(d['Produtividade']) || 0), 0);
+    const currentMonth = Number(ultimoMes['Produção']) || 0;
+
+    const totalProdutividade = dadosFiltrados.reduce((sum, d) => sum + (Number(d['Produção']) || 0), 0);
     const averagePeriod = totalProdutividade / dadosFiltrados.length;
     
     const percentageVsAverage = averagePeriod > 0 ? ((currentMonth - averagePeriod) / averagePeriod) * 100 : 0;
@@ -534,10 +568,10 @@ export function TabRelatorioPadrao() {
   // Dados para análise simplificada - apenas entradas vs baixados
   const flowData = useMemo(() => {
     if (dadosFiltrados.length === 0) return null;
-    
+
     const totals = {
-      entradas: dadosFiltrados.reduce((sum, d) => sum + (Number(d['Entrada - Total']) || 0), 0),
-      baixados: dadosFiltrados.reduce((sum, d) => sum + (Number(d['Baixados']) || 0), 0)
+      entradas: dadosFiltrados.reduce((sum, d) => sum + (Number(d['Entradas Novos']) || 0) + (Number(d['Outras Entradas']) || 0), 0),
+      baixados: dadosFiltrados.reduce((sum, d) => sum + (Number(d['Baixados Def.']) || 0) + (Number(d['Outras Baixas']) || 0), 0)
     };
 
     return {
@@ -551,37 +585,22 @@ export function TabRelatorioPadrao() {
   // Dados para gráfico de pizza - Composição do Acervo
   const pieData = useMemo(() => {
     if (dadosFiltrados.length === 0) return [];
-    
+
     const ultimoPeriodo = dadosFiltrados[dadosFiltrados.length - 1];
     return [
-      { 
-        name: 'Em Andamento', 
-        value: Number(ultimoPeriodo['Acervo em andamento']) || 0, 
-        fill: '#8884d8' 
-      },
-      { 
-        name: 'Conclusos', 
-        value: Number(ultimoPeriodo['Conclusos']) || 0, 
-        fill: '#82ca9d' 
-      },
-      {
-        name: 'Conclusos -100 dias',
-        value: Number(ultimoPeriodo['Conclusos - 100 dias']) || 0,
-        fill: '#ffc658'
-      },
-      {
-        name: 'Conclusos +365 dias',
-        value: Number(ultimoPeriodo['Conclusos + 365']) || 0,
-        fill: '#ff8042'
-      }
+      { name: 'And. Final', value: Number(ultimoPeriodo['And. Final']) || 0, fill: '#8884d8' },
+      { name: 'And. Cartório', value: Number(ultimoPeriodo['And. Cartório']) || 0, fill: '#AB63FA' },
+      { name: 'Conclusos Gab.', value: Number(ultimoPeriodo['Conclusos Gab.']) || 0, fill: '#82ca9d' },
+      { name: 'Concl. +120', value: Number(ultimoPeriodo['Concl. +120']) || 0, fill: '#ffc658' },
+      { name: 'Concl. +365', value: Number(ultimoPeriodo['Concl. +365']) || 0, fill: '#ff8042' },
     ].filter(item => item.value > 0);
   }, [dadosFiltrados]);
 
   // Dados para heatmap
   const heatmapData = useMemo((): HeatmapData[] => {
     if (dadosFiltrados.length === 0) return [];
-    
-    const metricas = ['Acervo total', 'Acervo em andamento', 'Conclusos', 'Conclusos - 100 dias', 'Conclusos + 365', 'Entradas - Casos novos', 'Entradas - Outras', 'Entrada - Total', 'Enviados Conclusos', 'Produtividade', 'Baixados'];
+
+    const metricas = COLUNAS_NUMERICAS_ESPERADAS;
     const data: HeatmapData[] = [];
     
     const maxValues: { [key: string]: number } = {};
@@ -593,7 +612,7 @@ export function TabRelatorioPadrao() {
       metricas.forEach(metrica => {
         const value = Number(periodo[metrica]) || 0;
         data.push({
-          month: periodo['Mês/Ano'],
+          month: periodo['Período'],
           metric: metrica,
           value,
           normalizedValue: maxValues[metrica] > 0 ? value / maxValues[metrica] : 0
@@ -607,7 +626,7 @@ export function TabRelatorioPadrao() {
   const analytics = useMemo((): AnalyticsData | null => {
     if (dadosFiltrados.length === 0) return null;
     
-    const kpiMetrics = ['Conclusos', 'Entrada - Total', 'Enviados Conclusos', 'Produtividade', 'Acervo total', 'Baixados'];
+    const kpiMetrics = ['Conclusos Gab.', 'Produção', 'Acervo Final', 'Baixados Def.', 'IAD', 'Taxa Congest.'];
     const kpiAverages: KpiData[] = kpiMetrics.map(metrica => {
         const total = dadosFiltrados.reduce((sum, d) => sum + (Number(d[metrica]) || 0), 0);
         return {
@@ -725,6 +744,29 @@ return (
         
         <div>
           <h3 className="font-semibold flex items-center gap-2 mb-3">
+            <Filter size={16}/> Ocultar Colunas (Tabela)
+          </h3>
+          <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
+            {COLUNAS_ESPERADAS.map(col => (
+              <div key={col} className="flex items-center gap-2">
+                <Checkbox
+                  id={`ocultar-${col}`}
+                  checked={colunasOcultas.includes(col)}
+                  onCheckedChange={(checked) => {
+                    setColunasOcultas(checked
+                      ? [...colunasOcultas, col]
+                      : colunasOcultas.filter(c => c !== col)
+                    );
+                  }}
+                />
+                <Label htmlFor={`ocultar-${col}`} className="text-xs">{col}</Label>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <h3 className="font-semibold flex items-center gap-2 mb-3">
             <Filter size={16}/> Comparar Métricas (Gráficos)
           </h3>
           <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
@@ -814,7 +856,7 @@ return (
                     <Table>
                       <TableHeader className="sticky top-0 bg-secondary z-10">
                         <TableRow>
-                          {COLUNAS_ESPERADAS.map(col => 
+                          {COLUNAS_ESPERADAS.filter(col => !colunasOcultas.includes(col)).map(col =>
                             <TableHead key={col} className="whitespace-nowrap">{col}</TableHead>
                           )}
                         </TableRow>
@@ -822,12 +864,12 @@ return (
                       <TableBody>
                         {dados.map((linha, rowIndex) => (
                           <TableRow key={rowIndex}>
-                            {COLUNAS_ESPERADAS.map(col => (
+                            {COLUNAS_ESPERADAS.filter(col => !colunasOcultas.includes(col)).map(col => (
                               <TableCell key={col} className="p-1">
-                                <Input 
-                                  className="w-28" 
-                                  value={linha[col] === undefined ? '' : String(linha[col])} 
-                                  onChange={(e) => handleRowChange(rowIndex, col, e.target.value)} 
+                                <Input
+                                  className="w-28"
+                                  value={linha[col] === undefined ? '' : String(linha[col])}
+                                  onChange={(e) => handleRowChange(rowIndex, col, e.target.value)}
                                 />
                               </TableCell>
                             ))}
@@ -858,7 +900,7 @@ return (
                 <TrendingUp size={20}/> Comparativo de Produtividade
               </CardTitle>
               <CardDescription>
-                Compara a produtividade do último mês ({dadosFiltrados[dadosFiltrados.length - 1]['Mês/Ano']}) com a média do período filtrado. 
+                Compara a produção do último período ({dadosFiltrados[dadosFiltrados.length - 1]['Período']}) com a média do período filtrado.
                 A porcentagem mostra se o último mês está acima (+) ou abaixo (-) da média. 
                 <strong> Excelente</strong> (≥+20%): muito acima da média; 
                 <strong> Bom</strong> (0% a +19%): acima da média; 
@@ -882,7 +924,7 @@ return (
                 <PieChartIcon size={20}/> Composição do Acervo Atual
               </CardTitle>
               <CardDescription>
-                Distribuição baseada no último período disponível ({dadosFiltrados[dadosFiltrados.length - 1]['Mês/Ano']}). 
+                Distribuição baseada no último período disponível ({dadosFiltrados[dadosFiltrados.length - 1]['Período']}).
                 Mostra como o acervo total está dividido entre processos em diferentes estágios de tramitação.
               </CardDescription>
             </CardHeader>
@@ -962,19 +1004,19 @@ return (
               <ResponsiveContainer width="100%" height={400}>
                 <LineChart data={dadosFiltrados} margin={{ top: 20 }}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="Mês/Ano" />
+                  <XAxis dataKey="Período" />
                   <YAxis />
                   <Tooltip />
                   <Legend />
                   {metricasSelecionadas.map(metrica => 
                     <Line key={metrica} type="monotone" dataKey={metrica} stroke={cores[metrica] || '#000000'} strokeWidth={2} />
                   )}
-                  {milestones.map((m, milestoneIndex) => 
-                    <ReferenceLine 
-                      key={milestoneIndex} 
-                      x={format(m.data, 'MMM/yy', { locale: ptBR }).toLowerCase()} 
-                      stroke="red" 
-                      label={{ value: m.desc, position: 'top', fill: 'red' }} 
+                  {milestones.map((m, milestoneIndex) =>
+                    <ReferenceLine
+                      key={milestoneIndex}
+                      x={format(m.data, 'MMM/yy', { locale: ptBR }).toLowerCase()}
+                      stroke="red"
+                      label={{ value: m.desc, position: 'top', fill: 'red' }}
                     />
                   )}
                 </LineChart>
@@ -988,7 +1030,7 @@ return (
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={dadosFiltrados}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="Mês/Ano" />
+                  <XAxis dataKey="Período" />
                   <YAxis />
                   <Tooltip />
                   <Legend />
@@ -1009,24 +1051,24 @@ return (
               <ResponsiveContainer width="100%" height={300}>
                 <AreaChart data={dadosFiltrados}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="Mês/Ano" />
+                  <XAxis dataKey="Período" />
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Area 
-                    type="monotone" 
-                    dataKey="Entradas - Casos novos" 
-                    stackId="1" 
-                    stroke="#19D3F3" 
-                    fill="#19D3F3" 
+                  <Area
+                    type="monotone"
+                    dataKey="Entradas Novos"
+                    stackId="1"
+                    stroke="#19D3F3"
+                    fill="#19D3F3"
                     fillOpacity={0.7}
                   />
-                  <Area 
-                    type="monotone" 
-                    dataKey="Entradas - Outras" 
-                    stackId="1" 
-                    stroke="#FF6692" 
-                    fill="#FF6692" 
+                  <Area
+                    type="monotone"
+                    dataKey="Outras Entradas"
+                    stackId="1"
+                    stroke="#FF6692"
+                    fill="#FF6692"
                     fillOpacity={0.7}
                   />
                 </AreaChart>
@@ -1037,25 +1079,25 @@ return (
           <Card>
             <CardHeader>
               <CardTitle>Análise com Linha de Tendência</CardTitle>
-              <CardDescription>Produtividade (barras) vs Enviados Conclusos (linha) com tendência</CardDescription>
+              <CardDescription>Produção (barras) vs Conclusos Gab. (linha) com tendência</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={400}>
                 <ComposedChart data={dadosFiltrados}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="Mês/Ano" />
+                  <XAxis dataKey="Período" />
                   <YAxis yAxisId="left" />
                   <YAxis yAxisId="right" orientation="right" />
                   <Tooltip />
                   <Legend />
-                  <Bar yAxisId="left" dataKey="Produtividade" fill="#82ca9d" name="Produtividade" />
-                  <Line 
-                    yAxisId="right" 
-                    type="monotone" 
-                    dataKey="Enviados Conclusos" 
-                    stroke="#8884d8" 
+                  <Bar yAxisId="left" dataKey="Produção" fill="#82ca9d" name="Produção" />
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="Conclusos Gab."
+                    stroke="#8884d8"
                     strokeWidth={3}
-                    name="Enviados Conclusos"
+                    name="Conclusos Gab."
                   />
                 </ComposedChart>
               </ResponsiveContainer>
@@ -1071,7 +1113,7 @@ return (
               <div className="overflow-x-auto">
                 <div className="inline-block min-w-full">
                   <div className="grid grid-cols-1 gap-4">
-                    {['Acervo total', 'Acervo em andamento', 'Conclusos', 'Conclusos - 100 dias', 'Conclusos + 365', 'Entradas - Casos novos', 'Entradas - Outras', 'Entrada - Total', 'Enviados Conclusos', 'Produtividade', 'Baixados'].map(metrica => (
+                    {COLUNAS_NUMERICAS_ESPERADAS.map(metrica => (
                       <div key={metrica} className="space-y-2">
                         <h4 className="font-medium text-sm">{metrica}</h4>
                         <div className="flex gap-1 flex-wrap">
