@@ -570,6 +570,11 @@ export function TabRelatorioPadrao({ refreshKey = 0 }: { refreshKey?: number }) 
     { name: 'Conclusos Gab.', value: acervoStats.gabinete, fill: '#22c55e' },
   ].filter(item => item.value > 0), [acervoStats]);
 
+  const estoqueData = useMemo(() => [
+    { name: 'Em Andamento', value: acervoStats.emAndamento, fill: '#3b82f6' },
+    { name: 'Paralisados/Baixados', value: acervoStats.total - acervoStats.emAndamento, fill: '#c084fc' },
+  ].filter(item => item.value > 0), [acervoStats]);
+
   // Dados para heatmap
   const heatmapData = useMemo((): HeatmapData[] => {
     if (dadosFiltrados.length === 0) return [];
@@ -881,18 +886,47 @@ return (
                   <p className="text-xs text-muted-foreground mb-3">
                     Este indicador mostra quantos processos existem na unidade ao final do período analisado.
                   </p>
-                  <div className="grid grid-cols-2 gap-3 mb-3">
-                    <div className="text-center p-4 bg-purple-50 rounded-lg border border-purple-200">
-                      <div className="text-2xl font-bold text-purple-700">
-                        {acervoStats.total.toLocaleString('pt-BR')}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                    <ResponsiveContainer width="100%" height={200}>
+                      <PieChart>
+                        <Pie
+                          data={estoqueData}
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={75}
+                          dataKey="value"
+                        >
+                          {estoqueData.map((entry) => (
+                            <Cell key={`cell-estoque-${entry.name}`} fill={entry.fill} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(value: number) => value.toLocaleString('pt-BR')} />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="flex flex-col justify-center gap-3">
+                      <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                        <span className="text-xl">📦</span>
+                        <div>
+                          <div className="text-lg font-bold text-purple-700">
+                            {acervoStats.total.toLocaleString('pt-BR')}
+                          </div>
+                          <div className="text-xs text-purple-900">
+                            Acervo Total ({(100).toFixed(0)}%)
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-xs font-medium text-purple-900 mt-1">Acervo Total</div>
-                    </div>
-                    <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
-                      <div className="text-2xl font-bold text-blue-700">
-                        {acervoStats.emAndamento.toLocaleString('pt-BR')}
+                      <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <span className="text-xl">⚙️</span>
+                        <div>
+                          <div className="text-lg font-bold text-blue-700">
+                            {acervoStats.emAndamento.toLocaleString('pt-BR')}
+                          </div>
+                          <div className="text-xs text-blue-900">
+                            Em Andamento ({acervoStats.total > 0 ? ((acervoStats.emAndamento / acervoStats.total) * 100).toFixed(2) : '0'}%)
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-xs font-medium text-blue-900 mt-1">Em Andamento</div>
                     </div>
                   </div>
                   <div className="p-3 bg-gray-50 rounded-lg text-xs text-gray-700 space-y-2">
