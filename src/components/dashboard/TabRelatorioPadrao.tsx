@@ -728,7 +728,7 @@ if (isLoading) return <div>Carregando dados...</div>;
 
 return (
   <div className="flex flex-col lg:flex-row gap-6 overflow-x-hidden">
-    <aside className="w-full lg:w-80 flex-shrink-0 bg-white p-6 border rounded-lg sticky top-8 max-h-[calc(100vh-4rem)] overflow-y-auto">
+    <aside className="w-full lg:w-80 flex-shrink-0 bg-white p-6 border rounded-lg h-fit sticky top-8">
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold">Controles</h2>
