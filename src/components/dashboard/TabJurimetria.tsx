@@ -53,210 +53,6 @@ interface Processo {
   [key: string]: string | number | undefined;
 }
 
-interface Alerta {
-  id: string;
-  processo: string;
-  tipo: 'CRITICO' | 'ALTO' | 'MEDIO';
-  categoria: string;
-  mensagem: string;
-  valor: number | string;
-  prazoLimite?: number;
-  acoes?: string[];
-}
-
-// ─── Alertas (baseados apenas em Dias Conclusos e campos disponíveis) ─────────
-const gerarAlertas = (processos: Processo[]): Alerta[] => {
-  const alertas: Alerta[] = [];
-
-  processos.forEach(processo => {
-    // CRITICO: Concluso há mais de 4 meses
-    if (processo['Dias Conclusos'] > 120) {
-      alertas.push({
-        id: `critico-concluso-${processo.Processo}`,
-        processo: processo.Processo,
-        tipo: 'CRITICO',
-        categoria: 'CONCLUSO_EXCESSIVO',
-        mensagem: `Concluso há ${processo['Dias Conclusos']} dias (${Math.round(processo['Dias Conclusos'] / 30)} meses)`,
-        valor: processo['Dias Conclusos'],
-        prazoLimite: 120,
-        acoes: ['Urgente: Verificar pendências', 'Contatar magistrado', 'Priorizar decisão']
-      });
-    }
-
-    // ALTO: Execução de alimentos conclusa há mais de 60 dias
-    const procLower = (processo.Procedimento || '').toLowerCase();
-    if (procLower.includes('execução') && processo.Assunto.toLowerCase().includes('alimentos') && processo['Dias Conclusos'] > 60) {
-      alertas.push({
-        id: `alto-alimentos-${processo.Processo}`,
-        processo: processo.Processo,
-        tipo: 'ALTO',
-        categoria: 'EXECUCAO_ALIMENTOS',
-        mensagem: `Execução de alimentos conclusa há ${processo['Dias Conclusos']} dias`,
-        valor: processo['Dias Conclusos'],
-        prazoLimite: 60,
-        acoes: ['Verificar bloqueios', 'Contatar devedor', 'Avaliar outras medidas coercitivas']
-      });
-    }
-
-    // ALTO: Processo envolvendo menores concluso há mais de 30 dias
-    if ((processo.Classe.toLowerCase().includes('guarda') ||
-         processo.Assunto.toLowerCase().includes('visita') ||
-         processo.Assunto.toLowerCase().includes('alienação parental')) &&
-        processo['Dias Conclusos'] > 30) {
-      alertas.push({
-        id: `alto-menor-${processo.Processo}`,
-        processo: processo.Processo,
-        tipo: 'ALTO',
-        categoria: 'INTERESSE_MENOR',
-        mensagem: `Processo envolvendo menor concluso há ${processo['Dias Conclusos']} dias`,
-        valor: processo['Dias Conclusos'],
-        prazoLimite: 30,
-        acoes: ['Priorizar decisão', 'Verificar acompanhamento psicossocial']
-      });
-    }
-
-    // MEDIO: Concluso entre 60-120 dias
-    if (processo['Dias Conclusos'] >= 60 && processo['Dias Conclusos'] <= 120) {
-      alertas.push({
-        id: `medio-concluso-${processo.Processo}`,
-        processo: processo.Processo,
-        tipo: 'MEDIO',
-        categoria: 'CONCLUSO_ATENCAO',
-        mensagem: `Concluso há ${processo['Dias Conclusos']} dias — próximo ao limite`,
-        valor: processo['Dias Conclusos'],
-        prazoLimite: 60,
-        acoes: ['Acompanhar prazo', 'Preparar para decisão']
-      });
-    }
-
-    // MEDIO: Divorcios com muitos eventos e concluso há mais de 45 dias
-    if (processo.Classe.toLowerCase().includes('divórcio') && processo['Dias Conclusos'] > 45) {
-      alertas.push({
-        id: `medio-divorcio-${processo.Processo}`,
-        processo: processo.Processo,
-        tipo: 'MEDIO',
-        categoria: 'DIVORCIO_PENDENTE',
-        mensagem: `Divórcio concluso há ${processo['Dias Conclusos']} dias`,
-        valor: processo['Dias Conclusos'],
-        prazoLimite: 45,
-        acoes: ['Verificar documentação', 'Priorizar julgamento']
-      });
-    }
-  });
-
-  return alertas.sort((a, b) => {
-    const prioridades = { 'CRITICO': 3, 'ALTO': 2, 'MEDIO': 1 };
-    return prioridades[b.tipo] - prioridades[a.tipo];
-  });
-};
-
-// ─── SistemaAlertas ───────────────────────────────────────────────────────────
-const SistemaAlertas = ({ alertas }: { alertas: Alerta[] }) => {
-  const [filtroTipo, setFiltroTipo] = useState<string>('TODOS');
-  const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
-
-  const alertasFiltrados = filtroTipo === 'TODOS' ? alertas : alertas.filter(a => a.tipo === filtroTipo);
-
-  const contadores = alertas.reduce((acc, alerta) => {
-    acc[alerta.tipo] = (acc[alerta.tipo] || 0) + 1;
-    return acc;
-  }, {} as { [key: string]: number });
-
-  const getCorAlerta = (tipo: string) => {
-    switch (tipo) {
-      case 'CRITICO': return 'border-red-500 bg-red-50';
-      case 'ALTO': return 'border-orange-500 bg-orange-50';
-      case 'MEDIO': return 'border-yellow-500 bg-yellow-50';
-      default: return 'border-gray-500 bg-gray-50';
-    }
-  };
-
-  const getIconeAlerta = (tipo: string) => {
-    switch (tipo) {
-      case 'CRITICO': return '🚨';
-      case 'ALTO': return '⚠️';
-      case 'MEDIO': return '⚡';
-      default: return '📌';
-    }
-  };
-
-  const toggleExpansao = (alertaId: string) => {
-    const novos = new Set(expandidos);
-    if (novos.has(alertaId)) novos.delete(alertaId);
-    else novos.add(alertaId);
-    setExpandidos(novos);
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex gap-2 flex-wrap">
-        {['TODOS', 'CRITICO', 'ALTO', 'MEDIO'].map(tipo => (
-          <button
-            key={tipo}
-            onClick={() => setFiltroTipo(tipo)}
-            className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${
-              filtroTipo === tipo ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-            }`}
-          >
-            {tipo === 'TODOS' ? `Todos (${alertas.length})` : `${getIconeAlerta(tipo)} ${tipo} (${contadores[tipo] || 0})`}
-          </button>
-        ))}
-      </div>
-
-      <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-        {alertasFiltrados.length === 0 ? (
-          <p className="text-gray-500 text-center py-8">Nenhum alerta para este filtro.</p>
-        ) : (
-          alertasFiltrados.map(alerta => (
-            <div key={alerta.id} className={`border-l-4 rounded-r-lg p-4 ${getCorAlerta(alerta.tipo)}`}>
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">{getIconeAlerta(alerta.tipo)}</span>
-                  <div>
-                    <div className="font-medium text-sm">{alerta.processo}</div>
-                    <div className="text-xs text-gray-600">{alerta.categoria}</div>
-                  </div>
-                </div>
-                <button onClick={() => toggleExpansao(alerta.id)} className="text-xs text-gray-500 hover:text-gray-800">
-                  {expandidos.has(alerta.id) ? '▲ menos' : '▼ mais'}
-                </button>
-              </div>
-              <p className="text-sm mt-2">{alerta.mensagem}</p>
-              {expandidos.has(alerta.id) && alerta.acoes && (
-                <div className="mt-3 pt-3 border-t border-gray-200">
-                  <div className="text-xs font-medium text-gray-700 mb-1">Ações recomendadas:</div>
-                  <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
-                    {alerta.acoes.map((acao, i) => <li key={i}>{acao}</li>)}
-                  </ul>
-                </div>
-              )}
-            </div>
-          ))
-        )}
-      </div>
-
-      <Card>
-        <CardHeader><CardTitle>Resumo dos Alertas</CardTitle></CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-3 gap-4 text-sm">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-red-600">{contadores.CRITICO || 0}</div>
-              <div className="text-gray-600">Críticos</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-orange-600">{contadores.ALTO || 0}</div>
-              <div className="text-gray-600">Alta Prioridade</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-yellow-600">{contadores.MEDIO || 0}</div>
-              <div className="text-gray-600">Média Prioridade</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
 
 // ─── KpiCard ──────────────────────────────────────────────────────────────────
 const KpiCard = ({ title, value, subtitle, icon, description }: {
@@ -315,11 +111,6 @@ export function TabJurimetria({ refreshKey = 0 }: { refreshKey?: number }) {
   }, [refreshKey]);
 
   const handlePrint = () => { window.print(); };
-
-  const alertas = useMemo(() => {
-    if (processos.length === 0) return [];
-    return gerarAlertas(processos);
-  }, [processos]);
 
   const stats = useMemo(() => {
     if (processos.length === 0) return null;
@@ -382,36 +173,6 @@ export function TabJurimetria({ refreshKey = 0 }: { refreshKey?: number }) {
       .sort((a, b) => b[1] - a[1])
       .map(([name, value]) => ({ name, value }));
 
-    // Distribuição por assessor
-    const assessorCounts: Record<string, number> = {};
-    for (const p of processos) {
-      const a = p.Assessor || 'Não identificado';
-      assessorCounts[a] = (assessorCounts[a] || 0) + 1;
-    }
-    const assessorData = Object.entries(assessorCounts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
-      .map(([name, value]) => ({ name, value }));
-
-    // Distribuição por fase processual
-    const faseCounts: Record<string, number> = {};
-    for (const p of processos) {
-      const f = p['Fase Processual'] || 'Não informada';
-      faseCounts[f] = (faseCounts[f] || 0) + 1;
-    }
-    const faseData = Object.entries(faseCounts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 8)
-      .map(([name, value]) => ({ name, value }));
-
-    // Top 5 Classes
-    const classeCounts: Record<string, number> = {};
-    for (const p of processos) { classeCounts[p.Classe] = (classeCounts[p.Classe] || 0) + 1; }
-    const top5Classes = Object.entries(classeCounts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([name, value]) => ({ name, value }));
-
     // Top 5 Assuntos
     const assuntoCounts: Record<string, number> = {};
     for (const p of processos) { assuntoCounts[p.Assunto] = (assuntoCounts[p.Assunto] || 0) + 1; }
@@ -420,12 +181,16 @@ export function TabJurimetria({ refreshKey = 0 }: { refreshKey?: number }) {
       .slice(0, 5)
       .map(([name, value]) => ({ name, value }));
 
+    // Top 30 processos com mais dias conclusos
+    const top30MaisAntigos = [...processos]
+      .sort((a, b) => b['Dias Conclusos'] - a['Dias Conclusos'])
+      .slice(0, 30);
+
     return {
       total, mediaDias, mediaEventos,
       conhecimentoCount, execucaoCount, outrosCount,
       agingData, criticalRanges, eventsData,
-      conclusaoData, assessorData, faseData,
-      top5Classes, top5Assuntos
+      conclusaoData, top5Assuntos, top30MaisAntigos
     };
   }, [processos]);
 
@@ -558,14 +323,11 @@ export function TabJurimetria({ refreshKey = 0 }: { refreshKey?: number }) {
               </Card>
             </div>
 
-            {/* Tabs com gráficos */}
+            {/* Gráficos */}
             <Tabs defaultValue="aging" className="space-y-4">
-              <TabsList className="grid w-full grid-cols-5">
+              <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="aging">Dias Conclusos</TabsTrigger>
-                <TabsTrigger value="eventos">Eventos</TabsTrigger>
-                <TabsTrigger value="assessores">Assessores</TabsTrigger>
-                <TabsTrigger value="classes">Classes</TabsTrigger>
-                <TabsTrigger value="alertas">Alertas ({alertas.length})</TabsTrigger>
+                <TabsTrigger value="eventos">Eventos &amp; Tipos</TabsTrigger>
               </TabsList>
 
               {/* Tab: Dias Conclusos */}
@@ -598,7 +360,7 @@ export function TabJurimetria({ refreshKey = 0 }: { refreshKey?: number }) {
                   <Card>
                     <CardHeader>
                       <CardTitle>Tipos de Conclusão</CardTitle>
-                      <CardDescription>Distribuição por tipo: Decisão, Despacho, Sentença</CardDescription>
+                      <CardDescription>Decisão, Despacho, Sentença</CardDescription>
                     </CardHeader>
                     <CardContent>
                       <ResponsiveContainer width="100%" height={300}>
@@ -622,26 +384,9 @@ export function TabJurimetria({ refreshKey = 0 }: { refreshKey?: number }) {
                     </CardContent>
                   </Card>
                 </div>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Fases Processuais</CardTitle>
-                    <CardDescription>Distribuição por fase processual</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={stats.faseData} layout="vertical" margin={{ left: 120 }}>
-                        <XAxis type="number" />
-                        <YAxis type="category" dataKey="name" width={120} interval={0} tick={{ fontSize: 11 }} />
-                        <Tooltip />
-                        <Bar dataKey="value" fill="#8884d8" name="Processos" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
               </TabsContent>
 
-              {/* Tab: Eventos */}
+              {/* Tab: Eventos & Tipos */}
               <TabsContent value="eventos" className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2">
                   <Card>
@@ -693,126 +438,74 @@ export function TabJurimetria({ refreshKey = 0 }: { refreshKey?: number }) {
                   </Card>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Top 5 Assuntos</CardTitle>
-                      <CardDescription>Assuntos com maior volume de processos</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <ResponsiveContainer width="100%" height={280}>
-                        <BarChart data={stats.top5Assuntos} layout="vertical" margin={{ left: 100 }}>
-                          <XAxis type="number" />
-                          <YAxis type="category" dataKey="name" width={100} interval={0} tick={{ fontSize: 10 }} />
-                          <Tooltip />
-                          <Bar dataKey="value" fill="#ffc658" name="Processos" />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Resumo Estatístico</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3 text-sm">
-                      <div className="flex justify-between">
-                        <span>Total de processos:</span>
-                        <Badge variant="default">{stats.total}</Badge>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Média Dias Conclusos:</span>
-                        <Badge variant="default">{stats.mediaDias.toFixed(1)} dias</Badge>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Média de Eventos:</span>
-                        <Badge variant="default">{stats.mediaEventos.toFixed(1)}</Badge>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Faixa crítica (120+):</span>
-                        <Badge variant="destructive">{stats.criticalRanges['120+ dias']} processos</Badge>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Faixa atenção (70-120):</span>
-                        <Badge variant="secondary">
-                          {stats.criticalRanges['70-100 dias'] + stats.criticalRanges['100-120 dias']} processos
-                        </Badge>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </TabsContent>
-
-              {/* Tab: Assessores */}
-              <TabsContent value="assessores" className="space-y-4">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Distribuição por Assessor</CardTitle>
-                    <CardDescription>Top 10 assessores por volume de processos conclusos</CardDescription>
+                    <CardTitle>Top 5 Assuntos</CardTitle>
+                    <CardDescription>Assuntos com maior volume de processos conclusos</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <ResponsiveContainer width="100%" height={350}>
-                      <BarChart data={stats.assessorData} layout="vertical" margin={{ left: 140 }}>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <BarChart data={stats.top5Assuntos} layout="vertical" margin={{ left: 120 }}>
                         <XAxis type="number" />
-                        <YAxis type="category" dataKey="name" width={140} interval={0} tick={{ fontSize: 11 }} />
+                        <YAxis type="category" dataKey="name" width={120} interval={0} tick={{ fontSize: 10 }} />
                         <Tooltip />
-                        <Bar dataKey="value" fill="#8884d8" name="Processos" />
+                        <Bar dataKey="value" fill="#ffc658" name="Processos" />
                       </BarChart>
                     </ResponsiveContainer>
                   </CardContent>
                 </Card>
               </TabsContent>
-
-              {/* Tab: Classes */}
-              <TabsContent value="classes" className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Top 5 Classes Processuais</CardTitle>
-                      <CardDescription>Classes com maior volume de processos</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={stats.top5Classes} layout="vertical" margin={{ left: 120 }}>
-                          <XAxis type="number" />
-                          <YAxis type="category" dataKey="name" width={120} interval={0} tick={{ fontSize: 11 }} />
-                          <Tooltip />
-                          <Bar dataKey="value" fill="#82ca9d" name="Processos" />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Faixas Críticas — Aging</CardTitle>
-                      <CardDescription>Processos nas faixas de atenção e crítica</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4 pt-4">
-                      {Object.entries(stats.criticalRanges).map(([faixa, count]) => (
-                        <div key={faixa}>
-                          <div className="flex justify-between text-sm mb-1">
-                            <span>{faixa}</span>
-                            <span className="font-medium">{count} ({((count / stats.total) * 100).toFixed(1)}%)</span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div
-                              className={`h-2 rounded-full ${faixa === '120+ dias' ? 'bg-red-500' : faixa === '100-120 dias' ? 'bg-orange-400' : 'bg-yellow-400'}`}
-                              style={{ width: `${Math.min((count / stats.total) * 100, 100)}%` }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </CardContent>
-                  </Card>
-                </div>
-              </TabsContent>
-
-              {/* Tab: Alertas */}
-              <TabsContent value="alertas" className="space-y-4">
-                <SistemaAlertas alertas={alertas} />
-              </TabsContent>
             </Tabs>
+
+            {/* Top 30 processos com mais dias conclusos */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Top 30 — Processos com Maior Tempo Concluso</CardTitle>
+                <CardDescription>
+                  Processos ordenados pelo maior número de dias conclusos (aguardando decisão há mais tempo)
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-gray-50 text-left">
+                        <th className="px-3 py-2 font-semibold">#</th>
+                        <th className="px-3 py-2 font-semibold">Processo</th>
+                        <th className="px-3 py-2 font-semibold text-right">Dias Conclusos</th>
+                        <th className="px-3 py-2 font-semibold">Tipo de Conclusão</th>
+                        <th className="px-3 py-2 font-semibold">Classe</th>
+                        <th className="px-3 py-2 font-semibold">Assessor</th>
+                        <th className="px-3 py-2 font-semibold">Eventos</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {stats.top30MaisAntigos.map((p, i) => {
+                        const dias = p['Dias Conclusos'];
+                        const critico = dias > 120;
+                        const atencao = dias >= 70 && dias <= 120;
+                        return (
+                          <tr key={p.Processo} className={`border-b hover:bg-gray-50 ${critico ? 'bg-red-50' : atencao ? 'bg-yellow-50' : ''}`}>
+                            <td className="px-3 py-2 text-gray-500">{i + 1}</td>
+                            <td className="px-3 py-2 font-mono text-xs">{p.Processo}</td>
+                            <td className="px-3 py-2 text-right">
+                              <span className={`font-bold ${critico ? 'text-red-600' : atencao ? 'text-orange-500' : 'text-gray-700'}`}>
+                                {dias}
+                              </span>
+                              <span className="text-gray-400 text-xs ml-1">({(dias / 30).toFixed(1)}m)</span>
+                            </td>
+                            <td className="px-3 py-2 text-gray-700">{p['Tipo de Conclusão']}</td>
+                            <td className="px-3 py-2 text-gray-700 max-w-[160px] truncate">{p.Classe}</td>
+                            <td className="px-3 py-2 text-gray-700">{p.Assessor}</td>
+                            <td className="px-3 py-2 text-gray-700 text-right">{p.Eventos}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
           </>
         )
       )}
