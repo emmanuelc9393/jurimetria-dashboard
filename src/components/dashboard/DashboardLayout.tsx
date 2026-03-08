@@ -5,27 +5,36 @@ import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TabRelatorioPadrao } from './TabRelatorioPadrao';
 import { TabJurimetria } from './TabJurimetria';
+import { TabGerenciamento } from './TabGerenciamento';
 import { getUpdateInfo } from '@/app/actions';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 export function DashboardLayout() {
   const [updateInfo, setUpdateInfo] = useState<string>('Carregando informações...');
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const fetchUpdateInfo = async () => {
+    const { timestamp, periodo } = await getUpdateInfo();
+    if (timestamp) {
+      const date = new Date(timestamp);
+      const formattedDate = format(date, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
+      const periodoInfo = periodo ? ` | Período: ${periodo}` : '';
+      setUpdateInfo(`Dashboard atualizado em: ${formattedDate}${periodoInfo}`);
+    } else {
+      setUpdateInfo('Nenhum dado foi salvo ainda.');
+    }
+  };
 
   useEffect(() => {
-    const fetchUpdateInfo = async () => {
-      const { timestamp, periodo } = await getUpdateInfo();
-      if (timestamp) {
-        const date = new Date(timestamp);
-        const formattedDate = format(date, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
-        const periodoInfo = periodo ? ` | Período: ${periodo}` : '';
-        setUpdateInfo(`Dashboard atualizado em: ${formattedDate}${periodoInfo}`);
-      } else {
-        setUpdateInfo('Nenhum dado foi salvo ainda.');
-      }
-    };
     fetchUpdateInfo();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const handleDataSaved = () => {
+    setRefreshKey(k => k + 1);
+    fetchUpdateInfo();
+  };
 
   return (
     <div className="bg-gray-50 min-h-screen p-8">
@@ -35,19 +44,24 @@ export function DashboardLayout() {
     <p className="text-sm text-gray-500 text-center">Criado por Emmanuel Araújo da Costa - v. 1.19</p>
     <p className="text-sm text-gray-500 mt-2 text-">{updateInfo}</p>
 </header>
-      
+
       <Tabs defaultValue="relatorio-padrao" className="w-full">
         <TabsList>
           <TabsTrigger value="relatorio-padrao">📄 Relatório Padrão</TabsTrigger>
           <TabsTrigger value="jurimetria">📊 Análise de Processos</TabsTrigger>
+          <TabsTrigger value="gerenciamento">🗂️ Gerenciamento e Entrada de Dados</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="relatorio-padrao" className="mt-4">
-          <TabRelatorioPadrao />
+          <TabRelatorioPadrao refreshKey={refreshKey} />
         </TabsContent>
-        
+
         <TabsContent value="jurimetria" className="mt-4">
-          <TabJurimetria />
+          <TabJurimetria refreshKey={refreshKey} />
+        </TabsContent>
+
+        <TabsContent value="gerenciamento" className="mt-4">
+          <TabGerenciamento onDataSaved={handleDataSaved} />
         </TabsContent>
       </Tabs>
     </div>
