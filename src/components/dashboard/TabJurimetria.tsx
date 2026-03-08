@@ -177,12 +177,20 @@ export function TabJurimetria({ refreshKey = 0 }: { refreshKey?: number }) {
       .sort((a, b) => b[1] - a[1])
       .map(([name, value]) => ({ name, value }));
 
-    // Top 10 Assuntos
+    // Top 15 Classes
+    const classeCounts: Record<string, number> = {};
+    for (const p of processos) { classeCounts[p.Classe] = (classeCounts[p.Classe] || 0) + 1; }
+    const top15Classes = Object.entries(classeCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 15)
+      .map(([name, value]) => ({ name, value }));
+
+    // Top 15 Assuntos
     const assuntoCounts: Record<string, number> = {};
     for (const p of processos) { assuntoCounts[p.Assunto] = (assuntoCounts[p.Assunto] || 0) + 1; }
-    const top10Assuntos = Object.entries(assuntoCounts)
+    const top15Assuntos = Object.entries(assuntoCounts)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
+      .slice(0, 15)
       .map(([name, value]) => ({ name, value }));
 
     // Processos por Ano de Autuação
@@ -213,7 +221,7 @@ export function TabJurimetria({ refreshKey = 0 }: { refreshKey?: number }) {
       total, mediaDias, mediaEventos,
       conhecimentoCount, execucaoCount, outrosCount,
       agingData, criticalRanges, eventsData,
-      conclusaoData, top10Assuntos, top30MaisAntigos,
+      conclusaoData, top15Classes, top15Assuntos, top30MaisAntigos,
       anoAutuacaoData, top30MaisTramitacao
     };
   }, [processos]);
@@ -536,22 +544,41 @@ export function TabJurimetria({ refreshKey = 0 }: { refreshKey?: number }) {
                   </Card>
                 </div>
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Top 10 Assuntos</CardTitle>
-                    <CardDescription>Assuntos com maior volume de processos conclusos</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={320}>
-                      <BarChart data={stats.top10Assuntos} layout="vertical" margin={{ left: 160 }}>
-                        <XAxis type="number" />
-                        <YAxis type="category" dataKey="name" width={160} interval={0} tick={{ fontSize: 10 }} />
-                        <Tooltip />
-                        <Bar dataKey="value" fill="#ffc658" name="Processos" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Top 15 Classes</CardTitle>
+                      <CardDescription>Classes com maior volume de processos conclusos</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={420}>
+                        <BarChart data={stats.top15Classes} layout="vertical" margin={{ left: 180 }}>
+                          <XAxis type="number" />
+                          <YAxis type="category" dataKey="name" width={180} interval={0} tick={{ fontSize: 9 }} />
+                          <Tooltip />
+                          <Bar dataKey="value" fill="#8884d8" name="Processos" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Top 15 Assuntos</CardTitle>
+                      <CardDescription>Assuntos com maior volume de processos conclusos</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={420}>
+                        <BarChart data={stats.top15Assuntos} layout="vertical" margin={{ left: 160 }}>
+                          <XAxis type="number" />
+                          <YAxis type="category" dataKey="name" width={160} interval={0} tick={{ fontSize: 9 }} />
+                          <Tooltip />
+                          <Bar dataKey="value" fill="#ffc658" name="Processos" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                </div>
 
                 <Card>
                   <CardHeader>

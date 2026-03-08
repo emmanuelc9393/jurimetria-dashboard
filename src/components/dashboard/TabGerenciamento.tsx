@@ -334,8 +334,9 @@ export function TabGerenciamento({ onDataSaved }: { onDataSaved: () => void }) {
       if (cells.length < 3) continue;
       const dataHora = cells[1] || '';
       if (!dataHora) continue;
-      const n = (idx: number) => Number(cells[idx]) || 0;
-      const f = (idx: number) => parseFloat(cells[idx]) || 0;
+      const clean = (idx: number) => String(cells[idx] || '').replace(/[^0-9.-]/g, '');
+      const n = (idx: number) => Number(clean(idx)) || 0;
+      const f = (idx: number) => parseFloat(clean(idx)) || 0;
       snapshots.push({
         dataHora,
         isMediaHistorica: dataHora.toUpperCase().includes('MÉDIA'),
