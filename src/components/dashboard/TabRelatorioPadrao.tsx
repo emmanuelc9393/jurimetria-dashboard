@@ -5,19 +5,16 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { 
   LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, 
   ResponsiveContainer, ReferenceLine, PieChart, Pie, Cell, AreaChart, Area,
   ComposedChart
 } from 'recharts';
-import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
-import { loadRelatorioData, saveRelatorioData } from '@/app/actions';
+import { loadRelatorioData } from '@/app/actions';
 import { 
   Calendar, Palette, Filter, Trash2, Sigma, TrendingUp, 
   PieChart as PieChartIcon, BarChart3, Download 
@@ -40,7 +37,6 @@ const COLUNAS_NUMERICAS_ESPERADAS = [
   'IAD', 'Taxa Congest.', 'Taxa Demanda', 'Taxa Redução'
 ];
 
-const COLUNAS_OCULTAS_PADRAO = ['ID', 'Data/Hora', 'Vara', 'Status'];
 
 interface DadosLinha {
   'Período': string;
@@ -91,11 +87,15 @@ interface ProductivityComparison {
   performance: 'excellent' | 'good' | 'attention' | 'intervention';
 }
 
+const METRICAS_INVERTIDAS = ['Conclusos Gab.', 'Entradas Novos', 'Outras Entradas'];
+
 const KpiCard = ({ title, value, recent }: { title: string, value: string, recent: string }) => {
   const avg = parseFloat(value);
   const rec = parseFloat(recent);
   const diff = avg !== 0 ? ((rec - avg) / avg) * 100 : 0;
-  const diffColor = diff >= 0 ? 'text-green-600' : 'text-red-500';
+  const isInverted = METRICAS_INVERTIDAS.includes(title);
+  const isPositive = isInverted ? diff <= 0 : diff >= 0;
+  const diffColor = isPositive ? 'text-green-600' : 'text-red-500';
   const diffLabel = diff >= 0 ? `+${diff.toFixed(1)}%` : `${diff.toFixed(1)}%`;
   return (
     <Card>
@@ -362,7 +362,7 @@ const exportToHTML = (dados: DadosLinha[], analytics: AnalyticsData | null, filt
   }
 };
 
-export function TabRelatorioPadrao() {
+export function TabRelatorioPadrao({ refreshKey = 0 }: { refreshKey?: number }) {
   const [dados, setDados] = useState<DadosLinha[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [colunasNumericas, setColunasNumericas] = useState<string[]>([]);
@@ -373,8 +373,6 @@ export function TabRelatorioPadrao() {
   ]);
   const [filtroDataInicio, setFiltroDataInicio] = useState<string>('');
   const [filtroDataFim, setFiltroDataFim] = useState<string>('');
-  const [pastedData, setPastedData] = useState<string>('');
-  const [colunasOcultas, setColunasOcultas] = useState<string[]>(COLUNAS_OCULTAS_PADRAO);
   const [cores, setCores] = useState<{ [key: string]: string }>({
     'Acervo Início': '#8884d8', 'Acervo Final': '#AB63FA', 'Conclusos Gab.': '#ff8042',
     'And. Cartório': '#FFA500', 'Concl. +120': '#EF553B', 'Concl. +365': '#FF6692',
@@ -390,18 +388,19 @@ export function TabRelatorioPadrao() {
       const dadosSalvos = await loadRelatorioData();
       if (dadosSalvos && dadosSalvos.length > 0) {
         processarDadosCarregados(dadosSalvos);
-        toast.success("Dados carregados do banco de dados!");
+        if (refreshKey > 0) toast.success("Dados atualizados!");
       }
       // Definir filtro padrão para últimos 2 anos
       const today = new Date();
       const twoYearsAgo = subYears(today, 2);
       setFiltroDataInicio(format(twoYearsAgo, 'yyyy-MM-dd'));
       setFiltroDataFim(format(today, 'yyyy-MM-dd'));
-      
+
       setIsLoading(false);
     };
     fetchData();
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshKey]);
 
   const processarDadosCarregados = (dadosParaProcessar: { [key: string]: string | number }[]) => {
     if (!dadosParaProcessar || dadosParaProcessar.length === 0) {
@@ -484,85 +483,11 @@ export function TabRelatorioPadrao() {
     }
   };
   
-  const handleFileChangeXLSX = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]; 
-    if (!file) return; 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try { 
-        const data = new Uint8Array(e.target?.result as ArrayBuffer); 
-        const workbook = XLSX.read(data, { type: 'array' }); 
-        const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]) as { [key: string]: string | number }[]; 
-        processarDadosCarregados(json); 
-      } catch { 
-        toast.error("Erro ao ler o arquivo XLSX."); 
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  };
-  
-  const handleProcessPastedData = () => {
-    if (!pastedData) return; 
-    const linhas = pastedData.trim().split('\n'); 
-    const cabecalho = linhas[0].split('\t'); 
-    const dadosJson = linhas.slice(1).map(linha => { 
-      const valores = linha.split('\t'); 
-      const obj: { [key: string]: string } = {}; 
-      cabecalho.forEach((key, index) => { 
-        obj[key.trim()] = valores[index]; 
-      }); 
-      return obj; 
-    }); 
-    processarDadosCarregados(dadosJson);
-  };
-
-  const handleSave = async () => {
-    const dadosParaSalvar = dados.map((linha) => {
-      const dadosLimpos: { [key: string]: string | number } = {};
-      Object.entries(linha).forEach(([key, value]) => {
-        if (key !== 'Data' && (typeof value === 'string' || typeof value === 'number')) {
-          dadosLimpos[key] = value;
-        }
-      });
-      return dadosLimpos;
-    }); 
-    
-    const result = await saveRelatorioData(dadosParaSalvar); 
-    if (result.success) toast.success("Dados salvos no banco de dados!"); 
-    else toast.error("Falha ao salvar os dados.", { description: result.error });
-  };
 
   const handleExportReport = () => {
     exportToHTML(dadosFiltrados, analytics, filtroDataInicio, filtroDataFim);
   };
 
-  const handleRowChange = (index: number, field: string, value: string) => {
-    const novosDados = dados.map((linha, idx) => {
-      if (idx !== index) return linha;
-      const updatedLine: DadosLinha = { ...linha };
-      const colsTexto = ['Período', 'ID', 'Data/Hora', 'Vara', 'Status'];
-      if (colsTexto.includes(field)) {
-        updatedLine[field] = value;
-      } else {
-        updatedLine[field] = Number(value) || 0;
-      }
-      return updatedLine;
-    });
-    setDados(novosDados);
-  };
-
-  const handleAddRow = () => {
-    const novaLinha: DadosLinha = {
-      'Período': 'jan/25',
-      'ID': '',
-      'Data/Hora': '',
-      'Vara': '',
-      'Status': '',
-      Data: new Date()
-    };
-    COLUNAS_NUMERICAS_ESPERADAS.forEach(col => { novaLinha[col] = 0; });
-    setDados([...dados, novaLinha]);
-  };
 
   const dadosFiltrados = useMemo(() => {
     if (!dados) return []; 
@@ -750,13 +675,10 @@ return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold">Controles</h2>
-          <div className="flex gap-2">
-            <Button onClick={handleSave} size="sm">Salvar</Button>
-            <Button onClick={handleExportReport} variant="outline" size="sm">
-              <Download size={16} className="mr-1"/>
-              PDF
-            </Button>
-          </div>
+          <Button onClick={handleExportReport} variant="outline" size="sm">
+            <Download size={16} className="mr-1"/>
+            PDF
+          </Button>
         </div>
         
         <div>
@@ -780,28 +702,6 @@ return (
         </div>
         </div>
         
-        <div>
-          <h3 className="font-semibold flex items-center gap-2 mb-3">
-            <Filter size={16}/> Ocultar Colunas (Tabela)
-          </h3>
-          <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
-            {COLUNAS_ESPERADAS.map(col => (
-              <div key={col} className="flex items-center gap-2">
-                <Checkbox
-                  id={`ocultar-${col}`}
-                  checked={colunasOcultas.includes(col)}
-                  onCheckedChange={(checked) => {
-                    setColunasOcultas(checked
-                      ? [...colunasOcultas, col]
-                      : colunasOcultas.filter(c => c !== col)
-                    );
-                  }}
-                />
-                <Label htmlFor={`ocultar-${col}`} className="text-xs">{col}</Label>
-              </div>
-            ))}
-          </div>
-        </div>
 
         <div>
           <h3 className="font-semibold flex items-center gap-2 mb-3">
@@ -863,67 +763,7 @@ return (
     </aside>
     
     <main className="flex-1 min-w-0 space-y-6 overflow-x-hidden">
-      <Accordion type="single" collapsible className="w-full">
-        <AccordionItem value="item-1">
-          <AccordionTrigger>Gerenciamento e Entrada de Dados</AccordionTrigger>
-          <AccordionContent>
-            <Card>
-              <CardHeader>
-                <CardTitle>Entrada de Dados do Relatório Padrão</CardTitle>
-                <CardDescription>Escolha um método para carregar ou editar os dados. Clique em &apos;Salvar&apos; na sidebar para persistir.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div>
-                  <Label htmlFor="xlsx-upload" className="font-semibold">Opção 1: Carregar Arquivo XLSX</Label>
-                  <Input id="xlsx-upload" type="file" accept=".xlsx, .xls" onChange={handleFileChangeXLSX} />
-                </div>
-                <div>
-                  <Label htmlFor="paste-area" className="font-semibold">Opção 2: Colar Dados do Excel (com cabeçalho)</Label>
-                  <Textarea 
-                    id="paste-area" 
-                    placeholder="Copie as células do Excel (incluindo a linha de cabeçalho) e cole aqui..." 
-                    value={pastedData} 
-                    onChange={(e) => setPastedData(e.target.value)} 
-                    rows={5} 
-                  />
-                  <Button onClick={handleProcessPastedData} className="mt-2">Processar Dados Colados</Button>
-                </div>
-                <div>
-                  <Label className="font-semibold">Opção 3: Edição Manual</Label>
-                  <div className="border rounded-md overflow-auto max-h-[40vh]">
-                    <Table>
-                      <TableHeader className="sticky top-0 bg-secondary z-10">
-                        <TableRow>
-                          {COLUNAS_ESPERADAS.filter(col => !colunasOcultas.includes(col)).map(col =>
-                            <TableHead key={col} className="whitespace-nowrap">{col}</TableHead>
-                          )}
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {dados.map((linha, rowIndex) => (
-                          <TableRow key={rowIndex}>
-                            {COLUNAS_ESPERADAS.filter(col => !colunasOcultas.includes(col)).map(col => (
-                              <TableCell key={col} className="p-1">
-                                <Input
-                                  className="w-28"
-                                  value={linha[col] === undefined ? '' : String(linha[col])}
-                                  onChange={(e) => handleRowChange(rowIndex, col, e.target.value)}
-                                />
-                              </TableCell>
-                            ))}
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                  <Button onClick={handleAddRow} className="mt-2">Adicionar Linha Manualmente</Button>
-                </div>
-              </CardContent>
-            </Card>
-          </AccordionContent>
-        </AccordionItem>
-      </Accordion>
-      
+
       {analytics && productivityComparison ? (
         <>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">

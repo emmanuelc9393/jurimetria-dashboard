@@ -4,13 +4,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, Legend, LineChart, Line, ScatterChart, Scatter } from 'recharts';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import * as XLSX from 'xlsx';
-import { parse, differenceInDays, format, startOfMonth, endOfMonth } from 'date-fns';
+import { differenceInDays, format, startOfMonth, endOfMonth } from 'date-fns';
 import { toast } from 'sonner';
-import { loadJurimetriaData, saveJurimetriaData } from '@/app/actions';
+import { loadJurimetriaData } from '@/app/actions';
 
 // Componente Badge customizado para substituir o shadcn/ui
 const Badge = ({ children, variant = "default", className = "" }: { 
@@ -466,7 +464,7 @@ const KpiCard = ({ title, value, subtitle, icon, trend, description }: {
 );
 
 // Componente Principal
-export function TabJurimetria() {
+export function TabJurimetria({ refreshKey = 0 }: { refreshKey?: number }) {
   const [processos, setProcessos] = useState<Processo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -501,80 +499,23 @@ export function TabJurimetria() {
             ...p,
             Autuação: new Date(p.Autuação as string),
           } as Processo;
-          
-          // Calcular campos adicionais
+
           processo.complexidade = calcularComplexidade(processo.Eventos, processo['Dias em Tramitação']);
           processo.eficiencia = calcularEficiencia(processo.Eventos, processo['Dias em Tramitação']);
           processo.categoria_tempo = categorizarTempo(processo['Dias em Tramitação']);
           processo.mes_autuacao = format(processo.Autuação, 'yyyy-MM');
           processo.ano_autuacao = processo.Autuação.getFullYear();
-          
+
           return processo;
         });
         setProcessos(dadosComDatas);
-        toast.success("Dados de processos da última sessão carregados.");
+        if (refreshKey > 0) toast.success("Dados de processos atualizados!");
       }
       setIsLoading(false);
     };
     fetchData();
-  }, []);
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
-        const sheetName = workbook.SheetNames[0];
-        const json = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]) as { [key: string]: string | number | Date }[];
-        
-        const dadosProcessados: Processo[] = json.map(p => {
-          const autuacao = p.Autuação;
-          const autuacaoDate = autuacao instanceof Date ? autuacao : parse(String(autuacao || '01/01/1970'), 'dd/MM/yyyy', new Date());
-          
-          const processo: Processo = {
-            Processo: String(p.Processo || ''),
-            Eventos: Number(p.Eventos) || 0,
-            Procedimento: String(p.Procedimento || 'Não especificado'),
-            Classe: String(p.Classe || 'Não especificada'),
-            Assunto: String(p.Assunto || 'Não especificado'),
-            'Tipo de Conclusão': String(p['Tipo de Conclusão'] || 'Não especificado'),
-            'Dias Conclusos': Number(p['Dias Conclusos']) || 0,
-            Autuação: autuacaoDate,
-            'Dias em Tramitação': Number(p['Dias em Tramitação']) || 0,
-          };
-          
-          // Calcular campos adicionais
-          processo.complexidade = calcularComplexidade(processo.Eventos, processo['Dias em Tramitação']);
-          processo.eficiencia = calcularEficiencia(processo.Eventos, processo['Dias em Tramitação']);
-          processo.categoria_tempo = categorizarTempo(processo['Dias em Tramitação']);
-          processo.mes_autuacao = format(processo.Autuação, 'yyyy-MM');
-          processo.ano_autuacao = processo.Autuação.getFullYear();
-          
-          return processo;
-        }).filter(p => p.Processo);
-        
-        setProcessos(dadosProcessados);
-        toast.success(`${dadosProcessados.length} processos carregados do arquivo.`);
-      } catch {
-        toast.error("Erro ao ler o arquivo XLSX.", { description: "Verifique o formato e as colunas do arquivo." });
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  };
-
-  const handleSave = async () => {
-    const dadosParaSalvar = processos.map(p => ({ ...p, Autuação: p.Autuação.toISOString() }));
-    const result = await saveJurimetriaData(dadosParaSalvar);
-    if (result.success) {
-      toast.success("Dados dos processos salvos no banco de dados!");
-    } else {
-      toast.error("Falha ao salvar os dados.");
-    }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshKey]);
 
   const handlePrint = () => { window.print(); };
 
@@ -751,16 +692,9 @@ export function TabJurimetria() {
 
       <Card className="no-print">
         <CardHeader>
-          <CardTitle>Gerenciamento de Dados de Processos</CardTitle>
-          <CardDescription>
-            Carregue um novo arquivo XLSX para substituir os dados atuais ou analise os dados já salvos.
-          </CardDescription>
+          <CardTitle>Exportar Relatório</CardTitle>
         </CardHeader>
-        <CardContent className="flex items-center gap-4">
-          <Input type="file" accept=".xlsx, .xls" onChange={handleFileChange} className="max-w-xs" />
-          <Button onClick={handleSave} disabled={processos.length === 0}>
-            Salvar Dados
-          </Button>
+        <CardContent>
           <Button onClick={handlePrint} variant="outline" disabled={processos.length === 0}>
             Exportar Relatório (PDF)
           </Button>
