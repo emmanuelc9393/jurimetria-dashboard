@@ -684,8 +684,8 @@ if (isLoading) return <div>Carregando dados...</div>;
 
 return (
   <div className="flex flex-col lg:flex-row gap-6 overflow-x-hidden">
-    <aside className="no-print w-full lg:w-80 flex-shrink-0 bg-white p-6 border rounded-lg sticky top-4 self-start max-h-[calc(100vh-2rem)] overflow-y-auto">
-      <div className="space-y-6">
+    <div className="no-print w-full lg:w-80 flex-shrink-0">
+      <div className="sticky top-4 bg-white p-6 border rounded-lg shadow-sm space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold">Controles</h2>
           <Button onClick={() => window.print()} variant="outline" size="sm">
@@ -773,8 +773,8 @@ return (
           </div>
         </div>
       </div>
-    </aside>
-    
+    </div>
+
     <main className="flex-1 min-w-0 space-y-6 overflow-x-hidden">
 
       {analytics && productivityComparison ? (
