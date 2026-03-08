@@ -564,6 +564,30 @@ export function TabRelatorioPadrao({ refreshKey = 0 }: { refreshKey?: number }) 
     ].filter(item => item.value > 0);
   }, [dadosFiltrados]);
 
+  // Estatísticas do acervo para o card reformulado
+  const acervoStats = useMemo(() => {
+    if (dadosFiltrados.length === 0) return { total: 0, emAndamento: 0, cartorio: 0, gabinete: 0, pctCartorio: 0, pctGabinete: 0 };
+    const ultimoPeriodo = dadosFiltrados[dadosFiltrados.length - 1];
+    const total = Number(ultimoPeriodo['Acervo Final']) || 0;
+    const emAndamento = Number(ultimoPeriodo['And. Final']) || 0;
+    const cartorio = Number(ultimoPeriodo['And. Cartório']) || 0;
+    const gabinete = Number(ultimoPeriodo['Conclusos Gab.']) || 0;
+    const totalDistribuicao = cartorio + gabinete;
+    return {
+      total,
+      emAndamento,
+      cartorio,
+      gabinete,
+      pctCartorio: totalDistribuicao > 0 ? (cartorio / totalDistribuicao) * 100 : 0,
+      pctGabinete: totalDistribuicao > 0 ? (gabinete / totalDistribuicao) * 100 : 0,
+    };
+  }, [dadosFiltrados]);
+
+  const acervoComposicaoData = useMemo(() => [
+    { name: 'And. Cartório', value: acervoStats.cartorio, fill: '#6366f1' },
+    { name: 'Conclusos Gab.', value: acervoStats.gabinete, fill: '#22c55e' },
+  ].filter(item => item.value > 0), [acervoStats]);
+
   // Dados para heatmap
   const heatmapData = useMemo((): HeatmapData[] => {
     if (dadosFiltrados.length === 0) return [];
@@ -862,30 +886,107 @@ return (
                   <PieChartIcon size={20}/> Composição do Acervo Atual
                 </CardTitle>
                 <CardDescription>
-                  Distribuição baseada no último período disponível ({dadosFiltrados[dadosFiltrados.length - 1]['Período']}).
-                  Mostra como o acervo total está dividido entre processos em diferentes estágios de tramitação.
+                  Este painel mostra o tamanho do acervo da unidade judicial e como os processos em andamento
+                  estão distribuídos entre cartório e gabinete, permitindo identificar onde está concentrada
+                  a carga de trabalho.
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }: PieLabelProps) => `${name || 'N/A'}: ${((percent || 0) * 100).toFixed(0)}%`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {pieData.map((entry) => (
-                        <Cell key={`cell-${entry.name}`} fill={entry.fill} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
+              <CardContent className="space-y-6">
+
+                {/* Seção 1 — Estoque total */}
+                <div>
+                  <h3 className="text-sm font-semibold mb-2">📦 1. Estoque total</h3>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Este indicador mostra quantos processos existem na unidade ao final do período analisado.
+                  </p>
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    <div className="text-center p-4 bg-purple-50 rounded-lg border border-purple-200">
+                      <div className="text-2xl font-bold text-purple-700">
+                        {acervoStats.total.toLocaleString('pt-BR')}
+                      </div>
+                      <div className="text-xs font-medium text-purple-900 mt-1">Acervo Total</div>
+                    </div>
+                    <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="text-2xl font-bold text-blue-700">
+                        {acervoStats.emAndamento.toLocaleString('pt-BR')}
+                      </div>
+                      <div className="text-xs font-medium text-blue-900 mt-1">Em Andamento</div>
+                    </div>
+                  </div>
+                  <div className="p-3 bg-gray-50 rounded-lg text-xs text-gray-700 space-y-2">
+                    <p>O <strong>acervo total final</strong> representa a soma de todos os processos existentes ao
+                    final do período analisado, <strong>independentemente da sua situação processual</strong>.</p>
+                    <p>Já o <strong>acervo em andamento final</strong> corresponde apenas aos processos que
+                    <strong> ainda estão tramitando</strong>, ou seja, que não foram concluídos ou baixados.</p>
+                    <p>A diferença entre os dois indicadores mostra que <strong>parte do acervo total já não está
+                    mais em tramitação ativa</strong>, embora ainda conste no sistema por questões administrativas
+                    ou processuais.</p>
+                  </div>
+                </div>
+
+                {/* Seção 2 — Composição do andamento */}
+                <div>
+                  <h3 className="text-sm font-semibold mb-2">⚙️ 2. Onde estão os processos (Composição do andamento)</h3>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    O gráfico abaixo mostra como os processos que ainda estão em andamento se distribuem entre
+                    cartório e gabinete.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                    <ResponsiveContainer width="100%" height={200}>
+                      <PieChart>
+                        <Pie
+                          data={acervoComposicaoData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, percent }: PieLabelProps) => `${name || 'N/A'}: ${((percent || 0) * 100).toFixed(1)}%`}
+                          outerRadius={75}
+                          dataKey="value"
+                        >
+                          {acervoComposicaoData.map((entry) => (
+                            <Cell key={`cell-${entry.name}`} fill={entry.fill} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(value: number) => value.toLocaleString('pt-BR')} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="flex flex-col justify-center gap-3">
+                      <div className="flex items-center gap-3 p-3 bg-indigo-50 rounded-lg border border-indigo-200">
+                        <span className="text-xl">📂</span>
+                        <div>
+                          <div className="text-lg font-bold text-indigo-700">
+                            {acervoStats.cartorio.toLocaleString('pt-BR')}
+                          </div>
+                          <div className="text-xs text-indigo-900">
+                            Andamento em Cartório ({acervoStats.pctCartorio.toFixed(2)}%)
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                        <span className="text-xl">⚖️</span>
+                        <div>
+                          <div className="text-lg font-bold text-green-700">
+                            {acervoStats.gabinete.toLocaleString('pt-BR')}
+                          </div>
+                          <div className="text-xs text-green-900">
+                            Conclusos ao Gabinete ({acervoStats.pctGabinete.toFixed(2)}%)
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Frase de diagnóstico automática */}
+                  <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <p className="text-xs text-blue-800">
+                      💡{' '}
+                      {acervoStats.pctCartorio >= acervoStats.pctGabinete
+                        ? `A maior parte do acervo em andamento (${acervoStats.pctCartorio.toFixed(0)}%) encontra-se atualmente no cartório.`
+                        : `A maior parte do acervo em andamento (${acervoStats.pctGabinete.toFixed(0)}%) encontra-se atualmente conclusa ao gabinete.`
+                      }
+                    </p>
+                  </div>
+                </div>
+
               </CardContent>
             </Card>
           </div>
