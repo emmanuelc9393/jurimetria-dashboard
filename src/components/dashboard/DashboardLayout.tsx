@@ -6,13 +6,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TabRelatorioPadrao } from './TabRelatorioPadrao';
 import { TabJurimetria } from './TabJurimetria';
 import { TabGerenciamento } from './TabGerenciamento';
-import { getUpdateInfo } from '@/app/actions';
+import { CardAnaliseInteligente } from './CardAnaliseInteligente';
+import { getUpdateInfo, loadHistoricoData } from '@/app/actions';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 export function DashboardLayout() {
   const [updateInfo, setUpdateInfo] = useState<string>('Carregando informações...');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [historicoRaw, setHistoricoRaw] = useState<{ [key: string]: string | number | undefined }[]>([]);
 
   const fetchUpdateInfo = async () => {
     const { timestamp, periodo } = await getUpdateInfo();
@@ -28,11 +30,13 @@ export function DashboardLayout() {
 
   useEffect(() => {
     fetchUpdateInfo();
+    loadHistoricoData().then(data => setHistoricoRaw(data as { [key: string]: string | number | undefined }[]));
   }, []);
 
   const handleDataSaved = () => {
     setRefreshKey(k => k + 1);
     fetchUpdateInfo();
+    loadHistoricoData().then(data => setHistoricoRaw(data as { [key: string]: string | number | undefined }[]));
   };
 
   return (
@@ -43,6 +47,8 @@ export function DashboardLayout() {
     <p className="text-sm text-gray-500 text-center">Criado por Emmanuel Araújo da Costa - v. 1.19</p>
     <p className="text-sm text-gray-500 mt-2 text-">{updateInfo}</p>
 </header>
+
+      <CardAnaliseInteligente historicoRaw={historicoRaw} />
 
       <Tabs defaultValue="relatorio-padrao" className="w-full">
         <TabsList>

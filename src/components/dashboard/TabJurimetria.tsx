@@ -296,7 +296,11 @@ export function TabJurimetria({ refreshKey = 0 }: { refreshKey?: number }) {
             {/* Cards rápidos de distribuição */}
             <div className="grid gap-4 md:grid-cols-3">
               <Card>
-                <CardHeader><CardTitle>Distribuição por Procedimento</CardTitle></CardHeader>
+                <CardHeader>
+                  <InfoTooltip description="Classificação dos processos conclusos por tipo de procedimento. Conhecimento engloba processos de cognição (divórcio, guarda, alimentos etc.); Execução são processos de cumprimento de sentença ou execução de título extrajudicial.">
+                    <CardTitle className="cursor-help border-b border-dotted border-gray-400 w-fit">Distribuição por Procedimento</CardTitle>
+                  </InfoTooltip>
+                </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
@@ -318,7 +322,11 @@ export function TabJurimetria({ refreshKey = 0 }: { refreshKey?: number }) {
               </Card>
 
               <Card>
-                <CardHeader><CardTitle>Tipos de Conclusão</CardTitle></CardHeader>
+                <CardHeader>
+                  <InfoTooltip description="Indica qual ato judicial foi responsável pela conclusão: Decisão (interlocutória), Despacho (ordinatório) ou Sentença (encerramento de mérito). A predominância de sentenças indica alta resolução de mérito; despachos e decisões indicam processos em fase intermediária.">
+                    <CardTitle className="cursor-help border-b border-dotted border-gray-400 w-fit">Tipos de Conclusão</CardTitle>
+                  </InfoTooltip>
+                </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
                     {stats.conclusaoData.slice(0, 4).map((item, index) => (
@@ -334,7 +342,11 @@ export function TabJurimetria({ refreshKey = 0 }: { refreshKey?: number }) {
               </Card>
 
               <Card>
-                <CardHeader><CardTitle>Faixas Críticas</CardTitle></CardHeader>
+                <CardHeader>
+                  <InfoTooltip description="Distribuição dos processos conclusos por tempo de espera por decisão. Faixas acima de 70 dias merecem atenção; acima de 120 dias indicam situação crítica que pode gerar reclamações disciplinares ou correcionais.">
+                    <CardTitle className="cursor-help border-b border-dotted border-gray-400 w-fit">Faixas Críticas</CardTitle>
+                  </InfoTooltip>
+                </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
                     {Object.entries(stats.criticalRanges).map(([faixa, count]) => (
