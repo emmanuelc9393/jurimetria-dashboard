@@ -14,7 +14,7 @@ import {
   ComposedChart
 } from 'recharts';
 import { toast } from 'sonner';
-import { loadRelatorioData } from '@/app/actions';
+import { loadRelatorioData, loadHistoricoData } from '@/app/actions';
 import { 
   Calendar, Palette, Filter, Trash2, Sigma, TrendingUp, 
   PieChart as PieChartIcon, BarChart3, Download 
@@ -355,8 +355,17 @@ const exportToHTML = (dados: DadosLinha[], analytics: AnalyticsData | null, filt
   }
 };
 
+interface HistoricoSnapshot {
+  dataHora: string;
+  isMediaHistorica: number;
+  conclusos: number;
+  mediaDias: number;
+  [key: string]: string | number;
+}
+
 export function TabRelatorioPadrao({ refreshKey = 0 }: { refreshKey?: number }) {
   const [dados, setDados] = useState<DadosLinha[]>([]);
+  const [historico, setHistorico] = useState<HistoricoSnapshot[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [colunasNumericas, setColunasNumericas] = useState<string[]>([]);
   const [metricasSelecionadas, setMetricasSelecionadas] = useState<string[]>([]);
@@ -378,10 +387,16 @@ export function TabRelatorioPadrao({ refreshKey = 0 }: { refreshKey?: number }) 
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
-      const dadosSalvos = await loadRelatorioData();
+      const [dadosSalvos, historicoDados] = await Promise.all([
+        loadRelatorioData(),
+        loadHistoricoData(),
+      ]);
       if (dadosSalvos && dadosSalvos.length > 0) {
         processarDadosCarregados(dadosSalvos);
         if (refreshKey > 0) toast.success("Dados atualizados!");
+      }
+      if (historicoDados && historicoDados.length > 0) {
+        setHistorico(historicoDados as HistoricoSnapshot[]);
       }
       // Definir filtro padrão para últimos 2 anos
       const today = new Date();
@@ -755,6 +770,58 @@ return (
     </aside>
     
     <main className="flex-1 min-w-0 space-y-6 overflow-x-hidden">
+
+      {historico.filter(s => !s.isMediaHistorica).length > 1 && (() => {
+        const parseTS = (ts: string): Date => {
+          const [date, time] = ts.split(' ');
+          if (!date) return new Date(0);
+          const [d, m, y] = date.split('/').map(Number);
+          const [hh, mm, ss] = (time || '0:0:0').split(':').map(Number);
+          return new Date(y, m - 1, d, hh, mm, ss);
+        };
+        const chartData = [...historico]
+          .filter(s => !s.isMediaHistorica)
+          .sort((a, b) => parseTS(a.dataHora).getTime() - parseTS(b.dataHora).getTime())
+          .map(s => ({
+            label: s.dataHora.split(' ')[0],
+            conclusos: s.conclusos,
+            mediaDias: s.mediaDias,
+          }));
+        const mediaHistorica = historico.find(s => s.isMediaHistorica);
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp size={20}/> Histórico de Snapshots — Conclusos ao Longo do Tempo
+              </CardTitle>
+              <CardDescription>
+                Evolução do número de processos conclusos e média de dias conclusos por observação.
+                {mediaHistorica && <> Média histórica: <strong>{mediaHistorica.conclusos} conclusos</strong>, <strong>{mediaHistorica.mediaDias} dias</strong>.</>}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={320}>
+                <ComposedChart data={chartData} margin={{ top: 10, right: 30 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="label" tick={{ fontSize: 9 }} interval="preserveStartEnd" />
+                  <YAxis yAxisId="left" label={{ value: 'Conclusos', angle: -90, position: 'insideLeft', style: { fontSize: 10 } }} />
+                  <YAxis yAxisId="right" orientation="right" label={{ value: 'Média Dias', angle: 90, position: 'insideRight', style: { fontSize: 10 } }} />
+                  <Tooltip />
+                  <Legend />
+                  <Bar yAxisId="left" dataKey="conclusos" fill="#82ca9d" name="Conclusos" opacity={0.7} />
+                  <Line yAxisId="right" type="monotone" dataKey="mediaDias" stroke="#ff8042" strokeWidth={2} name="Média Dias" dot={false} />
+                  {mediaHistorica && (
+                    <ReferenceLine yAxisId="left" y={mediaHistorica.conclusos} stroke="#82ca9d" strokeDasharray="5 5" label={{ value: `Média: ${mediaHistorica.conclusos}`, fill: '#82ca9d', fontSize: 10 }} />
+                  )}
+                  {mediaHistorica && (
+                    <ReferenceLine yAxisId="right" y={mediaHistorica.mediaDias} stroke="#ff8042" strokeDasharray="5 5" label={{ value: `Média dias: ${mediaHistorica.mediaDias}`, fill: '#ff8042', fontSize: 10 }} />
+                  )}
+                </ComposedChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {analytics && productivityComparison ? (
         <>
