@@ -11,7 +11,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { loginAction, saveRelatorioData, saveJurimetriaData } from '@/app/actions';
-import { parse, format } from 'date-fns';
 import { Lock } from 'lucide-react';
 
 // ─── Constants (shared with TabRelatorioPadrao) ───────────────────────────────
@@ -49,34 +48,11 @@ interface Processo {
   Assunto: string;
   'Tipo de Conclusão': string;
   'Dias Conclusos': number;
-  Autuação: Date;
-  'Dias em Tramitação': number;
-  complexidade?: 'Baixa' | 'Média' | 'Alta';
-  eficiencia?: number;
-  categoria_tempo?: string;
-  mes_autuacao?: string;
-  ano_autuacao?: number;
-  [key: string]: string | number | Date | undefined;
+  Assessor: string;
+  'Fase Processual': string;
+  [key: string]: string | number | undefined;
 }
 
-// ─── Helpers (mirrored from original tabs) ────────────────────────────────────
-
-const calcularComplexidade = (eventos: number, diasTramitacao: number): 'Baixa' | 'Média' | 'Alta' => {
-  const score = (eventos * 0.6) + (diasTramitacao / 30 * 0.4);
-  if (score < 25) return 'Baixa';
-  if (score < 50) return 'Média';
-  return 'Alta';
-};
-
-const calcularEficiencia = (eventos: number, diasTramitacao: number): number =>
-  diasTramitacao > 0 ? eventos / diasTramitacao : 0;
-
-const categorizarTempo = (dias: number): string => {
-  if (dias <= 90) return 'Rápido (≤3 meses)';
-  if (dias <= 365) return 'Normal (3m-1ano)';
-  if (dias <= 730) return 'Lento (1-2 anos)';
-  return 'Muito Lento (>2 anos)';
-};
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
@@ -279,36 +255,26 @@ export function TabGerenciamento({ onDataSaved }: { onDataSaved: () => void }) {
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+        const workbook = XLSX.read(data, { type: 'array' });
         const sheetName = workbook.SheetNames[0];
-        const json = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]) as { [key: string]: string | number | Date }[];
+        // Converter coluna Processo como string para preservar os 20 dígitos
+        const json = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {
+          raw: false, // força strings para todas as células
+        }) as { [key: string]: string }[];
 
-        const dadosProcessados: Processo[] = json.map(p => {
-          const autuacao = p.Autuação;
-          const autuacaoDate = autuacao instanceof Date
-            ? autuacao
-            : parse(String(autuacao || '01/01/1970'), 'dd/MM/yyyy', new Date());
-
-          const processo: Processo = {
-            Processo: String(p.Processo || ''),
+        const dadosProcessados: Processo[] = json
+          .filter(p => p.Processo && String(p.Processo).trim() !== '')
+          .map(p => ({
+            Processo: String(p.Processo || '').trim(),
             Eventos: Number(p.Eventos) || 0,
-            Procedimento: String(p.Procedimento || 'Não especificado'),
-            Classe: String(p.Classe || 'Não especificada'),
-            Assunto: String(p.Assunto || 'Não especificado'),
+            Procedimento: String(p.Procedimento || ''),
+            Classe: String(p.Classe || ''),
+            Assunto: String(p.Assunto || ''),
             'Tipo de Conclusão': String(p['Tipo de Conclusão'] || 'Não especificado'),
             'Dias Conclusos': Number(p['Dias Conclusos']) || 0,
-            Autuação: autuacaoDate,
-            'Dias em Tramitação': Number(p['Dias em Tramitação']) || 0,
-          };
-
-          processo.complexidade = calcularComplexidade(processo.Eventos, processo['Dias em Tramitação']);
-          processo.eficiencia = calcularEficiencia(processo.Eventos, processo['Dias em Tramitação']);
-          processo.categoria_tempo = categorizarTempo(processo['Dias em Tramitação']);
-          processo.mes_autuacao = format(processo.Autuação, 'yyyy-MM');
-          processo.ano_autuacao = processo.Autuação.getFullYear();
-
-          return processo;
-        }).filter(p => p.Processo);
+            Assessor: String(p.Assessor || 'Não identificado'),
+            'Fase Processual': String(p['Fase Processual'] || ''),
+          }));
 
         setProcessos(dadosProcessados);
         toast.success(`${dadosProcessados.length} processos carregados do arquivo.`);
@@ -323,8 +289,7 @@ export function TabGerenciamento({ onDataSaved }: { onDataSaved: () => void }) {
 
   const handleSaveJurimetria = async () => {
     if (processos.length === 0) { toast.warning("Nenhum dado para salvar."); return; }
-    const dadosParaSalvar = processos.map(p => ({ ...p, Autuação: p.Autuação.toISOString() }));
-    const result = await saveJurimetriaData(dadosParaSalvar);
+    const result = await saveJurimetriaData(processos);
     if (result.success) {
       toast.success("Dados dos processos salvos!");
       onDataSaved();
