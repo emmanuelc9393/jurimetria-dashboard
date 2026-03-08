@@ -394,20 +394,40 @@ export function TabRelatorioPadrao() {
     }
     setColunasNumericas(COLUNAS_NUMERICAS_ESPERADAS);
     setMetricasSelecionadas(['Conclusos Gab.', 'Produção']);
-    const mesesMap: { [key: string]: string } = { 'jan': '0', 'fev': '1', 'mar': '2', 'abr': '3', 'mai': '4', 'jun': '5', 'jul': '6', 'ago': '7', 'set': '8', 'out': '9', 'nov': '10', 'dez': '11' };
 
-    const parsePeriodo = (valor: string | number): Date | null => {
-      const str = String(valor).toLowerCase().trim();
+    const NOMES_MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+    const mesesMap: { [key: string]: number } = { 'jan': 0, 'fev': 1, 'mar': 2, 'abr': 3, 'mai': 4, 'jun': 5, 'jul': 6, 'ago': 7, 'set': 8, 'out': 9, 'nov': 10, 'dez': 11 };
+
+    const parsePeriodo = (valor: string | number): { data: Date; label: string } | null => {
+      const str = String(valor).trim();
+
+      // formato "01/02/2026 até 28/02/2026" ou "01/02/2026 ate 28/02/2026"
+      const matchRange = str.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+at[eé]\s+/i);
+      if (matchRange) {
+        const [, , mes, ano] = matchRange;
+        const d = new Date(parseInt(ano), parseInt(mes) - 1, 1);
+        if (!isNaN(d.getTime())) {
+          const label = `${NOMES_MESES[d.getMonth()]}/${ano.slice(-2)}`;
+          return { data: d, label };
+        }
+      }
+
       // formato jan/25 ou jan/2025
-      const partes = str.split('/');
+      const strLower = str.toLowerCase();
+      const partes = strLower.split('/');
       if (partes.length === 2 && mesesMap[partes[0]] !== undefined) {
         const anoStr = partes[1].length === 2 ? `20${partes[1]}` : partes[1];
-        const d = new Date(parseInt(anoStr), parseInt(mesesMap[partes[0]]), 1);
-        if (!isNaN(d.getTime())) return d;
+        const d = new Date(parseInt(anoStr), mesesMap[partes[0]], 1);
+        if (!isNaN(d.getTime())) return { data: d, label: strLower };
       }
+
       // formato ISO ou outros
       const d = new Date(valor as string);
-      if (!isNaN(d.getTime())) return d;
+      if (!isNaN(d.getTime())) {
+        const label = `${NOMES_MESES[d.getMonth()]}/${String(d.getFullYear()).slice(-2)}`;
+        return { data: d, label };
+      }
+
       return null;
     };
 
@@ -415,12 +435,12 @@ export function TabRelatorioPadrao() {
       try {
         const periodoValor = linha['Período'];
         if (periodoValor === undefined || periodoValor === null || String(periodoValor).trim() === '') return null;
-        const dataCompleta = parsePeriodo(periodoValor);
-        if (!dataCompleta) return null;
+        const resultado = parsePeriodo(periodoValor);
+        if (!resultado) return null;
 
         const linhaProcessada: DadosLinha = {
-          'Período': String(periodoValor),
-          Data: dataCompleta
+          'Período': resultado.label,
+          Data: resultado.data
         };
 
         // Colunas de texto não-numéricas (mantidas como string)
@@ -444,7 +464,7 @@ export function TabRelatorioPadrao() {
       setDados(dadosFormatados);
       toast.success(`${dadosFormatados.length} linhas de dados processadas com sucesso!`);
     } else {
-      toast.error("Nenhuma linha pôde ser processada.", { description: "Verifique se a coluna 'Período' está no formato correto (ex: jan/25)." });
+      toast.error("Nenhuma linha pôde ser processada.", { description: "Verifique se a coluna 'Período' está no formato correto (ex: jan/25 ou 01/01/2025 até 31/01/2025)." });
     }
   };
   
