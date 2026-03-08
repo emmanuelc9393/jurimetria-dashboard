@@ -80,6 +80,23 @@ const KpiCard = ({ title, value, subtitle, icon, description }: {
   </Card>
 );
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const formatAtuacao = (raw: string): string => {
+  if (!raw || raw === 'N/A' || raw === '') return raw;
+  // Já em formato DD/MM/YYYY ou DD-MM-YYYY — retorna como está
+  if (raw.match(/^\d{2}[\/\-]\d{2}[\/\-]\d{4}$/)) return raw.replace(/-/g, '/');
+  // Formato ISO (ex: "2000-07-11T03:00:28.000Z" ou "2000-07-11")
+  if (raw.match(/^\d{4}-\d{2}-\d{2}/)) {
+    const d = new Date(raw);
+    if (!isNaN(d.getTime())) {
+      const day = String(d.getUTCDate()).padStart(2, '0');
+      const mon = String(d.getUTCMonth() + 1).padStart(2, '0');
+      return `${day}/${mon}/${d.getUTCFullYear()}`;
+    }
+  }
+  return raw;
+};
+
 // ─── Componente Principal ─────────────────────────────────────────────────────
 export function TabJurimetria({ refreshKey = 0 }: { refreshKey?: number }) {
   const [processos, setProcessos] = useState<Processo[]>([]);
@@ -103,7 +120,7 @@ export function TabJurimetria({ refreshKey = 0 }: { refreshKey?: number }) {
           Assunto: String(p.Assunto || ''),
           'Tipo de Conclusão': String(p['Tipo de Conclusão'] || 'Não especificado'),
           'Dias em Tramitação': Number(p['Dias em Tramitação']) || 0,
-          Autuação: String(p['Autuação'] || ''),
+          Autuação: formatAtuacao(String(p['Autuação'] || '')),
         })) as Processo[];
         setProcessos(dados);
         if (refreshKey > 0) toast.success("Dados de processos atualizados!");
@@ -439,7 +456,7 @@ export function TabJurimetria({ refreshKey = 0 }: { refreshKey?: number }) {
                             <th className="px-3 py-2 font-semibold text-right">Dias Conclusos</th>
                             <th className="px-3 py-2 font-semibold">Tipo</th>
                             <th className="px-3 py-2 font-semibold">Classe</th>
-                            <th className="px-3 py-2 font-semibold">Assessor</th>
+                            <th className="px-3 py-2 font-semibold">Assunto</th>
                             <th className="px-3 py-2 font-semibold text-right">Eventos</th>
                           </tr>
                         </thead>
@@ -457,8 +474,8 @@ export function TabJurimetria({ refreshKey = 0 }: { refreshKey?: number }) {
                                   <span className="text-gray-400 text-xs ml-1">({(dias / 30).toFixed(1)}m)</span>
                                 </td>
                                 <td className="px-3 py-2 text-gray-700">{p['Tipo de Conclusão']}</td>
-                                <td className="px-3 py-2 text-gray-700 max-w-[160px] truncate">{p.Classe}</td>
-                                <td className="px-3 py-2 text-gray-700">{p.Assessor}</td>
+                                <td className="px-3 py-2 text-gray-700 max-w-[140px] truncate">{p.Classe}</td>
+                                <td className="px-3 py-2 text-gray-700 max-w-[140px] truncate">{p.Assunto}</td>
                                 <td className="px-3 py-2 text-gray-700 text-right">{p.Eventos}</td>
                               </tr>
                             );
@@ -574,7 +591,8 @@ export function TabJurimetria({ refreshKey = 0 }: { refreshKey?: number }) {
                             <th className="px-3 py-2 font-semibold text-right">Dias Concluso</th>
                             <th className="px-3 py-2 font-semibold">Autuação</th>
                             <th className="px-3 py-2 font-semibold">Classe</th>
-                            <th className="px-3 py-2 font-semibold">Assessor</th>
+                            <th className="px-3 py-2 font-semibold">Assunto</th>
+                            <th className="px-3 py-2 font-semibold text-right">Eventos</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -593,8 +611,9 @@ export function TabJurimetria({ refreshKey = 0 }: { refreshKey?: number }) {
                                 </td>
                                 <td className="px-3 py-2 text-right text-gray-600">{p['Dias Conclusos']}d</td>
                                 <td className="px-3 py-2 text-gray-700">{p.Autuação || '—'}</td>
-                                <td className="px-3 py-2 text-gray-700 max-w-[160px] truncate">{p.Classe}</td>
-                                <td className="px-3 py-2 text-gray-700">{p.Assessor}</td>
+                                <td className="px-3 py-2 text-gray-700 max-w-[120px] truncate">{p.Classe}</td>
+                                <td className="px-3 py-2 text-gray-700 max-w-[120px] truncate">{p.Assunto}</td>
+                                <td className="px-3 py-2 text-gray-700 text-right">{p.Eventos}</td>
                               </tr>
                             );
                           })}
