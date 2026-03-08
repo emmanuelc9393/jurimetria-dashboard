@@ -28,7 +28,6 @@ export function DashboardLayout() {
 
   useEffect(() => {
     fetchUpdateInfo();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleDataSaved = () => {

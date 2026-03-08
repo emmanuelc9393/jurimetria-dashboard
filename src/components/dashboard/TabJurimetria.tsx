@@ -312,7 +312,6 @@ export function TabJurimetria({ refreshKey = 0 }: { refreshKey?: number }) {
       setIsLoading(false);
     };
     fetchData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey]);
 
   const handlePrint = () => { window.print(); };

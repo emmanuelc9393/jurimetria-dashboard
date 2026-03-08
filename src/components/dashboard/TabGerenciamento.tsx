@@ -289,7 +289,7 @@ export function TabGerenciamento({ onDataSaved }: { onDataSaved: () => void }) {
 
   const handleSaveJurimetria = async () => {
     if (processos.length === 0) { toast.warning("Nenhum dado para salvar."); return; }
-    const result = await saveJurimetriaData(processos);
+    const result = await saveJurimetriaData(processos as { [key: string]: string | number }[]);
     if (result.success) {
       toast.success("Dados dos processos salvos!");
       onDataSaved();
