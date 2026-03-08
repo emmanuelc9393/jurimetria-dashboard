@@ -57,8 +57,8 @@ export async function getUpdateInfo() {
     const relatorioData = await kv.get('relatorio-padrao-data') as DataRow[] | null;
     let periodo = null;
     if (relatorioData && relatorioData.length > 0) {
-      const primeiroMes = relatorioData[0]['Mês/Ano'];
-      const ultimoMes = relatorioData[relatorioData.length - 1]['Mês/Ano'];
+      const primeiroMes = relatorioData[0]['Período'];
+      const ultimoMes = relatorioData[relatorioData.length - 1]['Período'];
       periodo = `${primeiroMes} - ${ultimoMes}`;
     }
     return { timestamp, periodo };
