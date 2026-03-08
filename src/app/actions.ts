@@ -74,6 +74,23 @@ export async function loadHistoricoData(): Promise<DataRow[]> {
   } catch { return []; }
 }
 
+// --- AÇÕES PARA COMPARATIVO ENTRE UNIDADES ---
+export async function saveComparativoData(rawText: string) {
+  try {
+    await kv.set('comparativo-data', rawText);
+    return { success: true };
+  } catch {
+    return { success: false, error: "Falha ao salvar no KV." };
+  }
+}
+
+export async function loadComparativoData(): Promise<string> {
+  try {
+    const data = await kv.get('comparativo-data');
+    return (data as string) || '';
+  } catch { return ''; }
+}
+
 export async function getUpdateInfo() {
   try {
     const timestamp = await kv.get('last-updated') as string | null;
