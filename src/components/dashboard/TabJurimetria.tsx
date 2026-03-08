@@ -114,8 +114,6 @@ export function TabJurimetria({ refreshKey = 0 }: { refreshKey?: number }) {
     fetchData();
   }, [refreshKey]);
 
-  const handlePrint = () => { window.print(); };
-
   const stats = useMemo(() => {
     if (processos.length === 0) return null;
 
@@ -226,30 +224,10 @@ export function TabJurimetria({ refreshKey = 0 }: { refreshKey?: number }) {
     };
   }, [processos]);
 
-  const PrintStyles = () => (
-    <style jsx global>{`
-      @media print {
-        .no-print { display: none !important; }
-        main { padding: 0 !important; }
-      }
-    `}</style>
-  );
-
   if (isLoading) return <div>Carregando dados dos processos...</div>;
 
   return (
     <div className="space-y-6">
-      <PrintStyles />
-
-      <Card className="no-print">
-        <CardHeader><CardTitle>Exportar Relatório</CardTitle></CardHeader>
-        <CardContent>
-          <Button onClick={handlePrint} variant="outline" disabled={processos.length === 0}>
-            Exportar Relatório (PDF)
-          </Button>
-        </CardContent>
-      </Card>
-
       {processos.length === 0 ? (
         <Card className="flex items-center justify-center py-12">
           <p className="text-gray-500">

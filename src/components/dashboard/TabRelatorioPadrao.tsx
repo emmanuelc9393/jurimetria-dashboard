@@ -80,7 +80,7 @@ interface ProductivityComparison {
   performance: 'excellent' | 'good' | 'attention' | 'intervention';
 }
 
-const METRICAS_INVERTIDAS = ['Conclusos Gab.', 'Entradas Novos', 'Outras Entradas'];
+const METRICAS_INVERTIDAS = ['Conclusos Gab.', 'Acervo Final', 'Entradas Novos', 'Outras Entradas'];
 
 const KpiCard = ({ title, value, recent }: { title: string, value: string, recent: string }) => {
   const avg = parseFloat(value);
@@ -594,7 +594,7 @@ export function TabRelatorioPadrao({ refreshKey = 0 }: { refreshKey?: number }) 
   const analytics = useMemo((): AnalyticsData | null => {
     if (dadosFiltrados.length === 0) return null;
     
-    const kpiMetrics = ['Conclusos Gab.', 'Produção', 'Entradas Novos', 'Outras Entradas', 'Baixados Def.', 'Outras Baixas'];
+    const kpiMetrics = ['Conclusos Gab.', 'Acervo Final', 'Entradas Novos', 'Outras Entradas', 'Baixados Def.', 'Outras Baixas'];
     const ultimoMes = dadosFiltrados[dadosFiltrados.length - 1];
     const kpiAverages: KpiData[] = kpiMetrics.map(metrica => {
         const total = dadosFiltrados.reduce((sum, d) => sum + (Number(d[metrica]) || 0), 0);
@@ -678,11 +678,11 @@ if (isLoading) return <div>Carregando dados...</div>;
 
 return (
   <div className="flex flex-col lg:flex-row gap-6 overflow-x-hidden">
-    <aside className="w-full lg:w-80 flex-shrink-0 bg-white p-6 border rounded-lg h-fit sticky top-8">
+    <aside className="no-print w-full lg:w-80 flex-shrink-0 bg-white p-6 border rounded-lg h-fit sticky top-8">
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold">Controles</h2>
-          <Button onClick={handleExportReport} variant="outline" size="sm">
+          <Button onClick={() => window.print()} variant="outline" size="sm">
             <Download size={16} className="mr-1"/>
             PDF
           </Button>
@@ -771,58 +771,6 @@ return (
     
     <main className="flex-1 min-w-0 space-y-6 overflow-x-hidden">
 
-      {historico.filter(s => !s.isMediaHistorica).length > 1 && (() => {
-        const parseTS = (ts: string): Date => {
-          const [date, time] = ts.split(' ');
-          if (!date) return new Date(0);
-          const [d, m, y] = date.split('/').map(Number);
-          const [hh, mm, ss] = (time || '0:0:0').split(':').map(Number);
-          return new Date(y, m - 1, d, hh, mm, ss);
-        };
-        const chartData = [...historico]
-          .filter(s => !s.isMediaHistorica)
-          .sort((a, b) => parseTS(a.dataHora).getTime() - parseTS(b.dataHora).getTime())
-          .map(s => ({
-            label: s.dataHora.split(' ')[0],
-            conclusos: s.conclusos,
-            mediaDias: s.mediaDias,
-          }));
-        const mediaHistorica = historico.find(s => s.isMediaHistorica);
-        return (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp size={20}/> Histórico de Snapshots — Conclusos ao Longo do Tempo
-              </CardTitle>
-              <CardDescription>
-                Evolução do número de processos conclusos e média de dias conclusos por observação.
-                {mediaHistorica && <> Média histórica: <strong>{mediaHistorica.conclusos} conclusos</strong>, <strong>{mediaHistorica.mediaDias} dias</strong>.</>}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={320}>
-                <ComposedChart data={chartData} margin={{ top: 10, right: 30 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="label" tick={{ fontSize: 9 }} interval="preserveStartEnd" />
-                  <YAxis yAxisId="left" label={{ value: 'Conclusos', angle: -90, position: 'insideLeft', style: { fontSize: 10 } }} />
-                  <YAxis yAxisId="right" orientation="right" label={{ value: 'Média Dias', angle: 90, position: 'insideRight', style: { fontSize: 10 } }} />
-                  <Tooltip />
-                  <Legend />
-                  <Bar yAxisId="left" dataKey="conclusos" fill="#82ca9d" name="Conclusos" opacity={0.7} />
-                  <Line yAxisId="right" type="monotone" dataKey="mediaDias" stroke="#ff8042" strokeWidth={2} name="Média Dias" dot={false} />
-                  {mediaHistorica && (
-                    <ReferenceLine yAxisId="left" y={mediaHistorica.conclusos} stroke="#82ca9d" strokeDasharray="5 5" label={{ value: `Média: ${mediaHistorica.conclusos}`, fill: '#82ca9d', fontSize: 10 }} />
-                  )}
-                  {mediaHistorica && (
-                    <ReferenceLine yAxisId="right" y={mediaHistorica.mediaDias} stroke="#ff8042" strokeDasharray="5 5" label={{ value: `Média dias: ${mediaHistorica.mediaDias}`, fill: '#ff8042', fontSize: 10 }} />
-                  )}
-                </ComposedChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        );
-      })()}
-
       {analytics && productivityComparison ? (
         <>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -831,63 +779,116 @@ return (
             ))}
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp size={20}/> Comparativo de Produtividade
-              </CardTitle>
-              <CardDescription>
-                Compara a produção do último período ({dadosFiltrados[dadosFiltrados.length - 1]['Período']}) com a média do período filtrado.
-                A porcentagem mostra se o último mês está acima (+) ou abaixo (-) da média. 
-                <strong> Excelente</strong> (≥+20%): muito acima da média; 
-                <strong> Bom</strong> (0% a +19%): acima da média; 
-                <strong> Atenção</strong> (-1% a -19%): abaixo da média; 
-                <strong> Intervenção</strong> (≤-20%): muito abaixo da média.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex justify-center">
-              <GaugeChart 
-                currentValue={productivityComparison.currentMonth}
-                averageValue={productivityComparison.averagePeriod}
-                title="Último Mês vs Média do Período"
-                comparison={productivityComparison}
-              />
-            </CardContent>
-          </Card>
+          {historico.filter(s => !s.isMediaHistorica).length > 1 && (() => {
+            const parseTS = (ts: string): Date => {
+              const [date, time] = ts.split(' ');
+              if (!date) return new Date(0);
+              const [d, m, y] = date.split('/').map(Number);
+              const [hh, mm, ss] = (time || '0:0:0').split(':').map(Number);
+              return new Date(y, m - 1, d, hh, mm, ss);
+            };
+            const chartData = [...historico]
+              .filter(s => !s.isMediaHistorica)
+              .sort((a, b) => parseTS(a.dataHora).getTime() - parseTS(b.dataHora).getTime())
+              .map(s => ({
+                label: s.dataHora.split(' ')[0],
+                conclusos: s.conclusos,
+                mediaDias: s.mediaDias,
+              }));
+            const mediaHistorica = historico.find(s => s.isMediaHistorica);
+            return (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp size={20}/> Histórico de Snapshots — Conclusos ao Longo do Tempo
+                  </CardTitle>
+                  <CardDescription>
+                    Evolução do número de processos conclusos e média de dias conclusos por observação.
+                    {mediaHistorica && <> Média histórica: <strong>{mediaHistorica.conclusos} conclusos</strong>, <strong>{mediaHistorica.mediaDias} dias</strong>.</>}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={320}>
+                    <ComposedChart data={chartData} margin={{ top: 10, right: 30 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="label" tick={{ fontSize: 9 }} interval="preserveStartEnd" />
+                      <YAxis yAxisId="left" label={{ value: 'Conclusos', angle: -90, position: 'insideLeft', style: { fontSize: 10 } }} />
+                      <YAxis yAxisId="right" orientation="right" label={{ value: 'Média Dias', angle: 90, position: 'insideRight', style: { fontSize: 10 } }} />
+                      <Tooltip />
+                      <Legend />
+                      <Bar yAxisId="left" dataKey="conclusos" fill="#82ca9d" name="Conclusos" opacity={0.7} />
+                      <Line yAxisId="right" type="monotone" dataKey="mediaDias" stroke="#ff8042" strokeWidth={2} name="Média Dias" dot={false} />
+                      {mediaHistorica && (
+                        <ReferenceLine yAxisId="left" y={mediaHistorica.conclusos} stroke="#82ca9d" strokeDasharray="5 5" label={{ value: `Média: ${mediaHistorica.conclusos}`, fill: '#82ca9d', fontSize: 10 }} />
+                      )}
+                      {mediaHistorica && (
+                        <ReferenceLine yAxisId="right" y={mediaHistorica.mediaDias} stroke="#ff8042" strokeDasharray="5 5" label={{ value: `Média dias: ${mediaHistorica.mediaDias}`, fill: '#ff8042', fontSize: 10 }} />
+                      )}
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            );
+          })()}
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <PieChartIcon size={20}/> Composição do Acervo Atual
-              </CardTitle>
-              <CardDescription>
-                Distribuição baseada no último período disponível ({dadosFiltrados[dadosFiltrados.length - 1]['Período']}).
-                Mostra como o acervo total está dividido entre processos em diferentes estágios de tramitação.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }: PieLabelProps) => `${name || 'N/A'}: ${((percent || 0) * 100).toFixed(0)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {pieData.map((entry) => (
-                      <Cell key={`cell-${entry.name}`} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-  
-            </CardContent>
-          </Card>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp size={20}/> Comparativo de Produtividade
+                </CardTitle>
+                <CardDescription>
+                  Compara a produção do último período ({dadosFiltrados[dadosFiltrados.length - 1]['Período']}) com a média do período filtrado.
+                  A porcentagem mostra se o último mês está acima (+) ou abaixo (-) da média.
+                  <strong> Excelente</strong> (≥+20%): muito acima da média;
+                  <strong> Bom</strong> (0% a +19%): acima da média;
+                  <strong> Atenção</strong> (-1% a -19%): abaixo da média;
+                  <strong> Intervenção</strong> (≤-20%): muito abaixo da média.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex justify-center">
+                <GaugeChart
+                  currentValue={productivityComparison.currentMonth}
+                  averageValue={productivityComparison.averagePeriod}
+                  title="Último Mês vs Média do Período"
+                  comparison={productivityComparison}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <PieChartIcon size={20}/> Composição do Acervo Atual
+                </CardTitle>
+                <CardDescription>
+                  Distribuição baseada no último período disponível ({dadosFiltrados[dadosFiltrados.length - 1]['Período']}).
+                  Mostra como o acervo total está dividido entre processos em diferentes estágios de tramitação.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }: PieLabelProps) => `${name || 'N/A'}: ${((percent || 0) * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {pieData.map((entry) => (
+                        <Cell key={`cell-${entry.name}`} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
 
           <Card>
             {/* Card simples: Fluxo Entradas vs Baixados */}
