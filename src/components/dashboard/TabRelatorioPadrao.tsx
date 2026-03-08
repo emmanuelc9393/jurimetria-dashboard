@@ -106,7 +106,7 @@ const KpiCard = ({ title, value, recent }: { title: string, value: string, recen
           <span className="text-xl font-bold">{value}</span>
         </div>
         <div className="flex items-baseline gap-2">
-          <span className="text-xs text-muted-foreground">Último mês</span>
+          <span className="text-xs text-muted-foreground">Mês atual</span>
           <span className="text-xl font-semibold">{recent}</span>
           <span className={`text-xs font-medium ${diffColor}`}>{diffLabel}</span>
         </div>
