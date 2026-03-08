@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
-import { loginAction, saveRelatorioData, saveJurimetriaData, saveHistoricoData } from '@/app/actions';
+import { loginAction, saveRelatorioData, saveJurimetriaData, saveHistoricoData, saveComparativoData } from '@/app/actions';
 import { Lock } from 'lucide-react';
 
 // ─── Constants (shared with TabRelatorioPadrao) ───────────────────────────────
@@ -97,6 +97,9 @@ export function TabGerenciamento({ onDataSaved }: { onDataSaved: () => void }) {
   // ── Histórico state ──
   const [historicoPastedData, setHistoricoPastedData] = useState('');
   const [historico, setHistorico] = useState<HistoricoSnapshot[]>([]);
+
+  // ── Comparativo state ──
+  const [comparativoPastedData, setComparativoPastedData] = useState('');
 
   // ── Auth ──────────────────────────────────────────────────────────────────
 
@@ -418,6 +421,18 @@ export function TabGerenciamento({ onDataSaved }: { onDataSaved: () => void }) {
     }
   };
 
+  // ── Comparativo handler ───────────────────────────────────────────────────
+  const handleSaveComparativo = async () => {
+    if (!comparativoPastedData.trim()) { toast.warning('Cole os dados do comparativo primeiro.'); return; }
+    const result = await saveComparativoData(comparativoPastedData.trim());
+    if (result.success) {
+      toast.success('Comparativo salvo!');
+      onDataSaved();
+    } else {
+      toast.error('Falha ao salvar comparativo.', { description: result.error });
+    }
+  };
+
   // ── Render: password gate ────────────────────────────────────────────────
 
   if (!isAuthenticated) {
@@ -627,6 +642,36 @@ export function TabGerenciamento({ onDataSaved }: { onDataSaved: () => void }) {
               </div>
             </>
           )}
+        </CardContent>
+      </Card>
+
+      {/* ── Comparativo Entre Unidades ───────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle>🏛️ Entrada de Dados — Comparativo Entre Unidades</CardTitle>
+          <CardDescription>
+            Cole abaixo os dados tabulares com as métricas das unidades da região metropolitana
+            (formato com cabeçalho, colunas separadas por tabulação). Valores com ↑ ou ↓ indicam
+            a unidade em destaque e sua posição relativa ao grupo.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label htmlFor="comparativo-paste" className="font-semibold">Colar Dados Tabulares</Label>
+            <Textarea
+              id="comparativo-paste"
+              placeholder={`Cole aqui os dados copiados do relatório (com cabeçalho na primeira linha):\nMês/Ano\tVara\tAcervo Início\t...\n03/2026\t2ª Vara...\t↑ 2681\t...`}
+              value={comparativoPastedData}
+              onChange={e => setComparativoPastedData(e.target.value)}
+              rows={8}
+              className="font-mono text-xs"
+            />
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={handleSaveComparativo} disabled={!comparativoPastedData.trim()}>
+              Salvar Comparativo
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>
