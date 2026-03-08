@@ -56,6 +56,7 @@ interface Milestone {
 interface KpiData {
   name: string;
   value: string;
+  recent: string;
 }
 
 interface StatsData {
@@ -90,14 +91,29 @@ interface ProductivityComparison {
   performance: 'excellent' | 'good' | 'attention' | 'intervention';
 }
 
-const KpiCard = ({ title, value }: { title: string, value: string }) => (
-  <Card>
-    <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">{title}</CardTitle></CardHeader>
-    <CardContent>
-      <div className="text-2xl font-bold">{value}</div>
-    </CardContent>
-  </Card>
-);
+const KpiCard = ({ title, value, recent }: { title: string, value: string, recent: string }) => {
+  const avg = parseFloat(value);
+  const rec = parseFloat(recent);
+  const diff = avg !== 0 ? ((rec - avg) / avg) * 100 : 0;
+  const diffColor = diff >= 0 ? 'text-green-600' : 'text-red-500';
+  const diffLabel = diff >= 0 ? `+${diff.toFixed(1)}%` : `${diff.toFixed(1)}%`;
+  return (
+    <Card>
+      <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">{title}</CardTitle></CardHeader>
+      <CardContent className="space-y-1">
+        <div className="flex items-baseline gap-2">
+          <span className="text-xs text-muted-foreground">Média</span>
+          <span className="text-xl font-bold">{value}</span>
+        </div>
+        <div className="flex items-baseline gap-2">
+          <span className="text-xs text-muted-foreground">Último mês</span>
+          <span className="text-xl font-semibold">{recent}</span>
+          <span className={`text-xs font-medium ${diffColor}`}>{diffLabel}</span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
 
 // Componente para Gráfico de Gauge melhorado
 const GaugeChart = ({ 
@@ -646,12 +662,14 @@ export function TabRelatorioPadrao() {
   const analytics = useMemo((): AnalyticsData | null => {
     if (dadosFiltrados.length === 0) return null;
     
-    const kpiMetrics = ['Conclusos Gab.', 'Produção', 'Acervo Final', 'Baixados Def.', 'IAD', 'Taxa Congest.'];
+    const kpiMetrics = ['Conclusos Gab.', 'Produção', 'Entradas Novos', 'Outras Entradas', 'Baixados Def.', 'Outras Baixas'];
+    const ultimoMes = dadosFiltrados[dadosFiltrados.length - 1];
     const kpiAverages: KpiData[] = kpiMetrics.map(metrica => {
         const total = dadosFiltrados.reduce((sum, d) => sum + (Number(d[metrica]) || 0), 0);
         return {
           name: metrica,
-          value: (total / dadosFiltrados.length).toFixed(1)
+          value: (total / dadosFiltrados.length).toFixed(1),
+          recent: Number(ultimoMes?.[metrica] || 0).toFixed(1),
       };
   });
 
@@ -910,7 +928,7 @@ return (
         <>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {analytics.kpiAverages.map(kpi => (
-              <KpiCard key={kpi.name} title={`Média de ${kpi.name}`} value={kpi.value} />
+              <KpiCard key={kpi.name} title={kpi.name} value={kpi.value} recent={kpi.recent} />
             ))}
           </div>
 
