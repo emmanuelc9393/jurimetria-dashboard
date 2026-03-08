@@ -56,6 +56,24 @@ export async function loadJurimetriaData(): Promise<DataRow[]> { // Especificand
   } catch { return []; }
 }
 
+// --- AÇÕES PARA HISTÓRICO DE SNAPSHOTS ---
+export async function saveHistoricoData(data: DataRow[]) {
+  try {
+    await kv.set('historico-data', data);
+    await updateTimestamp();
+    return { success: true };
+  } catch {
+    return { success: false, error: "Falha ao salvar no KV." };
+  }
+}
+
+export async function loadHistoricoData(): Promise<DataRow[]> {
+  try {
+    const data = await kv.get('historico-data');
+    return (data as DataRow[]) || [];
+  } catch { return []; }
+}
+
 export async function getUpdateInfo() {
   try {
     const timestamp = await kv.get('last-updated') as string | null;

@@ -48,6 +48,8 @@ interface Processo {
   Assunto: string;
   'Tipo de Conclusão': string;
   'Dias Conclusos': number;
+  'Dias em Tramitação': number;
+  Autuação: string;
   Assessor: string;
   'Fase Processual': string;
   [key: string]: string | number | undefined;
@@ -100,6 +102,8 @@ export function TabJurimetria({ refreshKey = 0 }: { refreshKey?: number }) {
           Classe: String(p.Classe || ''),
           Assunto: String(p.Assunto || ''),
           'Tipo de Conclusão': String(p['Tipo de Conclusão'] || 'Não especificado'),
+          'Dias em Tramitação': Number(p['Dias em Tramitação']) || 0,
+          Autuação: String(p['Autuação'] || ''),
         })) as Processo[];
         setProcessos(dados);
         if (refreshKey > 0) toast.success("Dados de processos atualizados!");
@@ -173,12 +177,26 @@ export function TabJurimetria({ refreshKey = 0 }: { refreshKey?: number }) {
       .sort((a, b) => b[1] - a[1])
       .map(([name, value]) => ({ name, value }));
 
-    // Top 5 Assuntos
+    // Top 10 Assuntos
     const assuntoCounts: Record<string, number> = {};
     for (const p of processos) { assuntoCounts[p.Assunto] = (assuntoCounts[p.Assunto] || 0) + 1; }
-    const top5Assuntos = Object.entries(assuntoCounts)
+    const top10Assuntos = Object.entries(assuntoCounts)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
+      .slice(0, 10)
+      .map(([name, value]) => ({ name, value }));
+
+    // Processos por Ano de Autuação
+    const anoCounts: Record<string, number> = {};
+    for (const p of processos) {
+      const autuacao = String(p.Autuação || '');
+      const parts = autuacao.split('/');
+      const ano = parts.length === 3 ? parts[2] : null;
+      if (ano && /^\d{4}$/.test(ano)) {
+        anoCounts[ano] = (anoCounts[ano] || 0) + 1;
+      }
+    }
+    const anoAutuacaoData = Object.entries(anoCounts)
+      .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([name, value]) => ({ name, value }));
 
     // Top 30 processos com mais dias conclusos
@@ -186,11 +204,17 @@ export function TabJurimetria({ refreshKey = 0 }: { refreshKey?: number }) {
       .sort((a, b) => b['Dias Conclusos'] - a['Dias Conclusos'])
       .slice(0, 30);
 
+    // Top 30 processos com maior tempo em tramitação
+    const top30MaisTramitacao = [...processos]
+      .sort((a, b) => b['Dias em Tramitação'] - a['Dias em Tramitação'])
+      .slice(0, 30);
+
     return {
       total, mediaDias, mediaEventos,
       conhecimentoCount, execucaoCount, outrosCount,
       agingData, criticalRanges, eventsData,
-      conclusaoData, top5Assuntos, top30MaisAntigos
+      conclusaoData, top10Assuntos, top30MaisAntigos,
+      anoAutuacaoData, top30MaisTramitacao
     };
   }, [processos]);
 
@@ -384,6 +408,80 @@ export function TabJurimetria({ refreshKey = 0 }: { refreshKey?: number }) {
                     </CardContent>
                   </Card>
                 </div>
+
+                {stats.anoAutuacaoData.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Processos por Ano de Autuação</CardTitle>
+                      <CardDescription>Volume de processos conclusos por ano em que foram autuados — revela o envelhecimento do acervo</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={280}>
+                        <BarChart data={stats.anoAutuacaoData}>
+                          <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                          <YAxis />
+                          <Tooltip />
+                          <Bar dataKey="value" name="Processos">
+                            {stats.anoAutuacaoData.map((entry, index) => (
+                              <Cell
+                                key={`cell-ano-${index}`}
+                                fill={parseInt(entry.name) <= 2020 ? '#EF4444' : parseInt(entry.name) <= 2022 ? '#F97316' : '#3B82F6'}
+                              />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        🔴 Autuados até 2020 (acervo antigo) · 🟠 2021–2022 · 🔵 2023 em diante
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Top 30 — Processos com Maior Tempo Concluso</CardTitle>
+                    <CardDescription>Processos ordenados pelo maior número de dias conclusos (aguardando decisão há mais tempo)</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b bg-gray-50 text-left">
+                            <th className="px-3 py-2 font-semibold">#</th>
+                            <th className="px-3 py-2 font-semibold">Processo</th>
+                            <th className="px-3 py-2 font-semibold text-right">Dias Conclusos</th>
+                            <th className="px-3 py-2 font-semibold">Tipo</th>
+                            <th className="px-3 py-2 font-semibold">Classe</th>
+                            <th className="px-3 py-2 font-semibold">Assessor</th>
+                            <th className="px-3 py-2 font-semibold text-right">Eventos</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {stats.top30MaisAntigos.map((p, i) => {
+                            const dias = p['Dias Conclusos'];
+                            const critico = dias > 120;
+                            const atencao = dias >= 70 && dias <= 120;
+                            return (
+                              <tr key={p.Processo} className={`border-b hover:bg-gray-50 ${critico ? 'bg-red-50' : atencao ? 'bg-yellow-50' : ''}`}>
+                                <td className="px-3 py-2 text-gray-500">{i + 1}</td>
+                                <td className="px-3 py-2 font-mono text-xs">{p.Processo}</td>
+                                <td className="px-3 py-2 text-right">
+                                  <span className={`font-bold ${critico ? 'text-red-600' : atencao ? 'text-orange-500' : 'text-gray-700'}`}>{dias}</span>
+                                  <span className="text-gray-400 text-xs ml-1">({(dias / 30).toFixed(1)}m)</span>
+                                </td>
+                                <td className="px-3 py-2 text-gray-700">{p['Tipo de Conclusão']}</td>
+                                <td className="px-3 py-2 text-gray-700 max-w-[160px] truncate">{p.Classe}</td>
+                                <td className="px-3 py-2 text-gray-700">{p.Assessor}</td>
+                                <td className="px-3 py-2 text-gray-700 text-right">{p.Eventos}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
               </TabsContent>
 
               {/* Tab: Eventos & Tipos */}
@@ -440,72 +538,68 @@ export function TabJurimetria({ refreshKey = 0 }: { refreshKey?: number }) {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle>Top 5 Assuntos</CardTitle>
+                    <CardTitle>Top 10 Assuntos</CardTitle>
                     <CardDescription>Assuntos com maior volume de processos conclusos</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <ResponsiveContainer width="100%" height={250}>
-                      <BarChart data={stats.top5Assuntos} layout="vertical" margin={{ left: 120 }}>
+                    <ResponsiveContainer width="100%" height={320}>
+                      <BarChart data={stats.top10Assuntos} layout="vertical" margin={{ left: 160 }}>
                         <XAxis type="number" />
-                        <YAxis type="category" dataKey="name" width={120} interval={0} tick={{ fontSize: 10 }} />
+                        <YAxis type="category" dataKey="name" width={160} interval={0} tick={{ fontSize: 10 }} />
                         <Tooltip />
                         <Bar dataKey="value" fill="#ffc658" name="Processos" />
                       </BarChart>
                     </ResponsiveContainer>
                   </CardContent>
                 </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Top 30 — Processos com Maior Tempo em Tramitação</CardTitle>
+                    <CardDescription>Processos mais antigos em tramitação no acervo (por Dias em Tramitação)</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b bg-gray-50 text-left">
+                            <th className="px-3 py-2 font-semibold">#</th>
+                            <th className="px-3 py-2 font-semibold">Processo</th>
+                            <th className="px-3 py-2 font-semibold text-right">Dias Tramitação</th>
+                            <th className="px-3 py-2 font-semibold text-right">Dias Concluso</th>
+                            <th className="px-3 py-2 font-semibold">Autuação</th>
+                            <th className="px-3 py-2 font-semibold">Classe</th>
+                            <th className="px-3 py-2 font-semibold">Assessor</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {stats.top30MaisTramitacao.map((p, i) => {
+                            const tram = p['Dias em Tramitação'];
+                            const anos = (tram / 365).toFixed(1);
+                            const muitoAntigo = tram > 2000;
+                            const antigo = tram > 1000;
+                            return (
+                              <tr key={p.Processo} className={`border-b hover:bg-gray-50 ${muitoAntigo ? 'bg-red-50' : antigo ? 'bg-yellow-50' : ''}`}>
+                                <td className="px-3 py-2 text-gray-500">{i + 1}</td>
+                                <td className="px-3 py-2 font-mono text-xs">{p.Processo}</td>
+                                <td className="px-3 py-2 text-right">
+                                  <span className={`font-bold ${muitoAntigo ? 'text-red-600' : antigo ? 'text-orange-500' : 'text-gray-700'}`}>{tram}</span>
+                                  <span className="text-gray-400 text-xs ml-1">({anos}a)</span>
+                                </td>
+                                <td className="px-3 py-2 text-right text-gray-600">{p['Dias Conclusos']}d</td>
+                                <td className="px-3 py-2 text-gray-700">{p.Autuação || '—'}</td>
+                                <td className="px-3 py-2 text-gray-700 max-w-[160px] truncate">{p.Classe}</td>
+                                <td className="px-3 py-2 text-gray-700">{p.Assessor}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
               </TabsContent>
             </Tabs>
-
-            {/* Top 30 processos com mais dias conclusos */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Top 30 — Processos com Maior Tempo Concluso</CardTitle>
-                <CardDescription>
-                  Processos ordenados pelo maior número de dias conclusos (aguardando decisão há mais tempo)
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b bg-gray-50 text-left">
-                        <th className="px-3 py-2 font-semibold">#</th>
-                        <th className="px-3 py-2 font-semibold">Processo</th>
-                        <th className="px-3 py-2 font-semibold text-right">Dias Conclusos</th>
-                        <th className="px-3 py-2 font-semibold">Tipo de Conclusão</th>
-                        <th className="px-3 py-2 font-semibold">Classe</th>
-                        <th className="px-3 py-2 font-semibold">Assessor</th>
-                        <th className="px-3 py-2 font-semibold">Eventos</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {stats.top30MaisAntigos.map((p, i) => {
-                        const dias = p['Dias Conclusos'];
-                        const critico = dias > 120;
-                        const atencao = dias >= 70 && dias <= 120;
-                        return (
-                          <tr key={p.Processo} className={`border-b hover:bg-gray-50 ${critico ? 'bg-red-50' : atencao ? 'bg-yellow-50' : ''}`}>
-                            <td className="px-3 py-2 text-gray-500">{i + 1}</td>
-                            <td className="px-3 py-2 font-mono text-xs">{p.Processo}</td>
-                            <td className="px-3 py-2 text-right">
-                              <span className={`font-bold ${critico ? 'text-red-600' : atencao ? 'text-orange-500' : 'text-gray-700'}`}>
-                                {dias}
-                              </span>
-                              <span className="text-gray-400 text-xs ml-1">({(dias / 30).toFixed(1)}m)</span>
-                            </td>
-                            <td className="px-3 py-2 text-gray-700">{p['Tipo de Conclusão']}</td>
-                            <td className="px-3 py-2 text-gray-700 max-w-[160px] truncate">{p.Classe}</td>
-                            <td className="px-3 py-2 text-gray-700">{p.Assessor}</td>
-                            <td className="px-3 py-2 text-gray-700 text-right">{p.Eventos}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
           </>
         )
       )}

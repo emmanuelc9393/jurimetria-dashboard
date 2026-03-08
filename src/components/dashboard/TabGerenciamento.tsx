@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
-import { loginAction, saveRelatorioData, saveJurimetriaData } from '@/app/actions';
+import { loginAction, saveRelatorioData, saveJurimetriaData, saveHistoricoData } from '@/app/actions';
 import { Lock } from 'lucide-react';
 
 // ─── Constants (shared with TabRelatorioPadrao) ───────────────────────────────
@@ -48,9 +48,34 @@ interface Processo {
   Assunto: string;
   'Tipo de Conclusão': string;
   'Dias Conclusos': number;
+  'Dias em Tramitação': number;
+  Autuação: string;
   Assessor: string;
   'Fase Processual': string;
   [key: string]: string | number | undefined;
+}
+
+interface HistoricoSnapshot {
+  dataHora: string;
+  isMediaHistorica: boolean;
+  conclusos: number;
+  mediaDias: number;
+  mediaEventos: number;
+  decisao: number;
+  despacho: number;
+  sentenca: number;
+  conhecimento: number;
+  execucao: number;
+  outros: number;
+  dias0_30: number;
+  dias31_60: number;
+  dias61_90: number;
+  dias91_120: number;
+  eventos0_20: number;
+  eventos21_50: number;
+  eventos51_100: number;
+  eventos101_200: number;
+  eventos201plus: number;
 }
 
 
@@ -68,6 +93,10 @@ export function TabGerenciamento({ onDataSaved }: { onDataSaved: () => void }) {
 
   // ── Jurimetria state ──
   const [processos, setProcessos] = useState<Processo[]>([]);
+
+  // ── Histórico state ──
+  const [historicoPastedData, setHistoricoPastedData] = useState('');
+  const [historico, setHistorico] = useState<HistoricoSnapshot[]>([]);
 
   // ── Auth ──────────────────────────────────────────────────────────────────
 
@@ -272,6 +301,8 @@ export function TabGerenciamento({ onDataSaved }: { onDataSaved: () => void }) {
             Assunto: String(p.Assunto || ''),
             'Tipo de Conclusão': String(p['Tipo de Conclusão'] || 'Não especificado'),
             'Dias Conclusos': Number(p['Dias Conclusos']) || 0,
+            'Dias em Tramitação': Number(p['Dias em Tramitação']) || 0,
+            Autuação: String(p['Autuação'] || ''),
             Assessor: String(p.Assessor || 'Não identificado'),
             'Fase Processual': String(p['Fase Processual'] || ''),
           }));
@@ -285,6 +316,94 @@ export function TabGerenciamento({ onDataSaved }: { onDataSaved: () => void }) {
       }
     };
     reader.readAsArrayBuffer(file);
+  };
+
+  // ── Histórico handlers ────────────────────────────────────────────────────
+
+  const parseMarkdownHistorico = (markdown: string): HistoricoSnapshot[] => {
+    const lines = markdown.split('\n')
+      .map(l => l.trim())
+      .filter(l => l.startsWith('|') && !l.match(/^\|\s*-{3}/));
+
+    // lines[0] = cabeçalho de grupos, lines[1] = cabeçalho de colunas, lines[2+] = dados
+    if (lines.length < 3) return [];
+
+    const snapshots: HistoricoSnapshot[] = [];
+    for (let i = 2; i < lines.length; i++) {
+      const cells = lines[i].split('|').map(c => c.trim()).filter(Boolean);
+      if (cells.length < 3) continue;
+      const dataHora = cells[1] || '';
+      if (!dataHora) continue;
+      const n = (idx: number) => Number(cells[idx]) || 0;
+      const f = (idx: number) => parseFloat(cells[idx]) || 0;
+      snapshots.push({
+        dataHora,
+        isMediaHistorica: dataHora.toUpperCase().includes('MÉDIA'),
+        conclusos: n(2),
+        mediaDias: f(3),
+        mediaEventos: f(4),
+        decisao: n(5),
+        despacho: n(6),
+        sentenca: n(7),
+        conhecimento: n(8),
+        execucao: n(9),
+        outros: n(10),
+        dias0_30: n(11),
+        dias31_60: n(12),
+        dias61_90: n(13),
+        dias91_120: n(14),
+        eventos0_20: n(15),
+        eventos21_50: n(16),
+        eventos51_100: n(17),
+        eventos101_200: n(18),
+        eventos201plus: n(19),
+      });
+    }
+    return snapshots;
+  };
+
+  const handleProcessHistorico = () => {
+    if (!historicoPastedData.trim()) { toast.warning('Cole os dados do histórico primeiro.'); return; }
+    const parsed = parseMarkdownHistorico(historicoPastedData);
+    if (parsed.length === 0) {
+      toast.error('Nenhum dado reconhecido. Verifique o formato da tabela markdown.');
+      return;
+    }
+    setHistorico(parsed);
+    toast.success(`${parsed.length} snapshots processados (incluindo média histórica se presente).`);
+  };
+
+  const handleSaveHistorico = async () => {
+    if (historico.length === 0) { toast.warning('Nenhum dado de histórico para salvar.'); return; }
+    const dadosParaSalvar = historico.map(s => ({
+      dataHora: s.dataHora,
+      isMediaHistorica: s.isMediaHistorica ? 1 : 0,
+      conclusos: s.conclusos,
+      mediaDias: s.mediaDias,
+      mediaEventos: s.mediaEventos,
+      decisao: s.decisao,
+      despacho: s.despacho,
+      sentenca: s.sentenca,
+      conhecimento: s.conhecimento,
+      execucao: s.execucao,
+      outros: s.outros,
+      dias0_30: s.dias0_30,
+      dias31_60: s.dias31_60,
+      dias61_90: s.dias61_90,
+      dias91_120: s.dias91_120,
+      eventos0_20: s.eventos0_20,
+      eventos21_50: s.eventos21_50,
+      eventos51_100: s.eventos51_100,
+      eventos101_200: s.eventos101_200,
+      eventos201plus: s.eventos201plus,
+    }));
+    const result = await saveHistoricoData(dadosParaSalvar);
+    if (result.success) {
+      toast.success('Histórico de snapshots salvo!');
+      onDataSaved();
+    } else {
+      toast.error('Falha ao salvar histórico.', { description: result.error });
+    }
   };
 
   const handleSaveJurimetria = async () => {
@@ -432,6 +551,80 @@ export function TabGerenciamento({ onDataSaved }: { onDataSaved: () => void }) {
             <p className="text-sm text-muted-foreground">
               {processos.length} processo(s) carregado(s) e prontos para salvar.
             </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Histórico de Snapshots ────────────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle>📈 Entrada de Dados — Histórico de Snapshots</CardTitle>
+          <CardDescription>
+            Cole abaixo a tabela markdown exportada do eProc (formato com cabeçalho duplo). Cada linha representa uma observação diária dos processos conclusos.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label htmlFor="historico-paste" className="font-semibold">Colar Tabela Markdown</Label>
+            <Textarea
+              id="historico-paste"
+              placeholder="Cole aqui a tabela markdown do histórico (começando com | Nº | Métricas Básicas | ...)..."
+              value={historicoPastedData}
+              onChange={e => setHistoricoPastedData(e.target.value)}
+              rows={6}
+              className="font-mono text-xs"
+            />
+            <Button onClick={handleProcessHistorico} className="mt-2">Processar Histórico</Button>
+          </div>
+
+          {historico.length > 0 && (
+            <>
+              <div className="text-sm text-muted-foreground">
+                {historico.length} snapshot(s) processado(s).
+                {historico.filter(s => s.isMediaHistorica).length > 0 && ' Inclui linha de Média Histórica.'}
+              </div>
+              <div className="border rounded-md overflow-auto max-h-[40vh]">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      <th className="px-2 py-1 text-left">Data/Hora</th>
+                      <th className="px-2 py-1 text-right">Conclusos</th>
+                      <th className="px-2 py-1 text-right">Média Dias</th>
+                      <th className="px-2 py-1 text-right">Decisão</th>
+                      <th className="px-2 py-1 text-right">Despacho</th>
+                      <th className="px-2 py-1 text-right">Sentença</th>
+                      <th className="px-2 py-1 text-right">Conhec.</th>
+                      <th className="px-2 py-1 text-right">Execução</th>
+                      <th className="px-2 py-1 text-right">0-30d</th>
+                      <th className="px-2 py-1 text-right">31-60d</th>
+                      <th className="px-2 py-1 text-right">61-90d</th>
+                      <th className="px-2 py-1 text-right">91-120d</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historico.map((s, i) => (
+                      <tr key={i} className={`border-b ${s.isMediaHistorica ? 'bg-blue-50 font-semibold' : 'hover:bg-gray-50'}`}>
+                        <td className="px-2 py-1">{s.dataHora}</td>
+                        <td className="px-2 py-1 text-right">{s.conclusos}</td>
+                        <td className="px-2 py-1 text-right">{s.mediaDias}</td>
+                        <td className="px-2 py-1 text-right">{s.decisao}</td>
+                        <td className="px-2 py-1 text-right">{s.despacho}</td>
+                        <td className="px-2 py-1 text-right">{s.sentenca}</td>
+                        <td className="px-2 py-1 text-right">{s.conhecimento}</td>
+                        <td className="px-2 py-1 text-right">{s.execucao}</td>
+                        <td className="px-2 py-1 text-right">{s.dias0_30}</td>
+                        <td className="px-2 py-1 text-right">{s.dias31_60}</td>
+                        <td className="px-2 py-1 text-right">{s.dias61_90}</td>
+                        <td className="px-2 py-1 text-right">{s.dias91_120}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex justify-end">
+                <Button onClick={handleSaveHistorico}>Salvar Histórico</Button>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
