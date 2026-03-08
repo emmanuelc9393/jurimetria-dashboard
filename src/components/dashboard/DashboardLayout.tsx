@@ -47,7 +47,7 @@ export function DashboardLayout() {
       <Tabs defaultValue="relatorio-padrao" className="w-full">
         <TabsList>
           <TabsTrigger value="relatorio-padrao">📄 Relatório Padrão</TabsTrigger>
-          <TabsTrigger value="jurimetria">📊 Análise de Processos</TabsTrigger>
+          <TabsTrigger value="jurimetria">📊 Análise de Processos Conclusos</TabsTrigger>
           <TabsTrigger value="gerenciamento">🗂️ Gerenciamento e Entrada de Dados</TabsTrigger>
         </TabsList>
 
