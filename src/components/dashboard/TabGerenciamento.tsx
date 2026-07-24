@@ -71,6 +71,7 @@ interface HistoricoSnapshot {
   dias31_60: number;
   dias61_90: number;
   dias91_120: number;
+  dias121plus: number;
   eventos0_20: number;
   eventos21_50: number;
   eventos51_100: number;
@@ -331,6 +332,13 @@ export function TabGerenciamento({ onDataSaved }: { onDataSaved: () => void }) {
     // lines[0] = cabeçalho de grupos, lines[1] = cabeçalho de colunas, lines[2+] = dados
     if (lines.length < 3) return [];
 
+    // A "Faixa de Dias" pode vir com 4 colunas (0-30d..91-120d, formato antigo)
+    // ou 5 colunas (incluindo 121+d, formato atual do eProc). Detectamos pelo
+    // cabeçalho de colunas para manter compatibilidade com colagens antigas.
+    const headerCells = lines[1].split('|').map(c => c.trim()).filter(Boolean);
+    const has121Column = headerCells.some(c => c.replace(/\s/g, '') === '121+d');
+    const eventosOffset = has121Column ? 16 : 15;
+
     const snapshots: HistoricoSnapshot[] = [];
     for (let i = 2; i < lines.length; i++) {
       const cells = lines[i].split('|').map(c => c.trim()).filter(Boolean);
@@ -356,11 +364,12 @@ export function TabGerenciamento({ onDataSaved }: { onDataSaved: () => void }) {
         dias31_60: n(12),
         dias61_90: n(13),
         dias91_120: n(14),
-        eventos0_20: n(15),
-        eventos21_50: n(16),
-        eventos51_100: n(17),
-        eventos101_200: n(18),
-        eventos201plus: n(19),
+        dias121plus: has121Column ? n(15) : 0,
+        eventos0_20: n(eventosOffset),
+        eventos21_50: n(eventosOffset + 1),
+        eventos51_100: n(eventosOffset + 2),
+        eventos101_200: n(eventosOffset + 3),
+        eventos201plus: n(eventosOffset + 4),
       });
     }
     return snapshots;
@@ -395,6 +404,7 @@ export function TabGerenciamento({ onDataSaved }: { onDataSaved: () => void }) {
       dias31_60: s.dias31_60,
       dias61_90: s.dias61_90,
       dias91_120: s.dias91_120,
+      dias121plus: s.dias121plus,
       eventos0_20: s.eventos0_20,
       eventos21_50: s.eventos21_50,
       eventos51_100: s.eventos51_100,
@@ -576,7 +586,7 @@ export function TabGerenciamento({ onDataSaved }: { onDataSaved: () => void }) {
         <CardHeader>
           <CardTitle>📈 Entrada de Dados — Histórico de Snapshots</CardTitle>
           <CardDescription>
-            Cole abaixo a tabela markdown exportada do eProc (formato com cabeçalho duplo). Cada linha representa uma observação diária dos processos conclusos.
+            Cole abaixo a tabela markdown exportada do eProc (formato com cabeçalho duplo). Cada linha representa uma observação diária dos processos conclusos. Aceita tanto o formato antigo da Faixa de Dias (0-30d a 91-120d) quanto o atual, com a coluna adicional 121+d.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -615,6 +625,7 @@ export function TabGerenciamento({ onDataSaved }: { onDataSaved: () => void }) {
                       <th className="px-2 py-1 text-right">31-60d</th>
                       <th className="px-2 py-1 text-right">61-90d</th>
                       <th className="px-2 py-1 text-right">91-120d</th>
+                      <th className="px-2 py-1 text-right">121+d</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -632,6 +643,7 @@ export function TabGerenciamento({ onDataSaved }: { onDataSaved: () => void }) {
                         <td className="px-2 py-1 text-right">{s.dias31_60}</td>
                         <td className="px-2 py-1 text-right">{s.dias61_90}</td>
                         <td className="px-2 py-1 text-right">{s.dias91_120}</td>
+                        <td className="px-2 py-1 text-right">{s.dias121plus}</td>
                       </tr>
                     ))}
                   </tbody>
