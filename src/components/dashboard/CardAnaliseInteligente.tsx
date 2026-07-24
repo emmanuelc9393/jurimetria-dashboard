@@ -24,6 +24,7 @@ interface Snapshot {
   dias31_60: number;
   dias61_90: number;
   dias91_120: number;
+  dias121plus: number;
   eventos0_20: number;
   eventos21_50: number;
   eventos51_100: number;
@@ -55,6 +56,7 @@ function toSnapshot(row: DataRow): Snapshot {
     dias31_60: Number(row.dias31_60) || 0,
     dias61_90: Number(row.dias61_90) || 0,
     dias91_120: Number(row.dias91_120) || 0,
+    dias121plus: Number(row.dias121plus) || 0,
     eventos0_20: Number(row.eventos0_20) || 0,
     eventos21_50: Number(row.eventos21_50) || 0,
     eventos51_100: Number(row.eventos51_100) || 0,
@@ -147,7 +149,18 @@ function buildAllInsights(
     );
   }
 
-  // 5. Faixa 91-120d — higher = alert (critical aging)
+  // 5. Faixa 121+d — higher = alert (most critical aging: processos muito atrasados)
+  if (exceedsPct(ult.dias121plus, med.dias121plus, 10)) {
+    const diff = ult.dias121plus - med.dias121plus;
+    push(diff > 0, diff > 0 ? '🔴' : '🟢',
+      `Processos na faixa 121+ dias: ${ult.dias121plus} (média: ${med.dias121plus}) — ` +
+      (diff > 0
+        ? `faixa mais crítica do acervo em alta — ${diff} processos a mais que a média muito além do prazo.`
+        : `acervo com menos processos extremamente atrasados — ${Math.abs(diff)} a menos nessa faixa.`)
+    );
+  }
+
+  // 6. Faixa 91-120d — higher = alert (critical aging)
   if (exceedsPct(ult.dias91_120, med.dias91_120, 10)) {
     const diff = ult.dias91_120 - med.dias91_120;
     push(diff > 0, diff > 0 ? '🔴' : '🟢',
@@ -158,7 +171,7 @@ function buildAllInsights(
     );
   }
 
-  // 6. Faixa 61-90d — higher = alert
+  // 7. Faixa 61-90d — higher = alert
   if (exceedsPct(ult.dias61_90, med.dias61_90, 10)) {
     const diff = ult.dias61_90 - med.dias61_90;
     push(diff > 0, diff > 0 ? '⚠️' : '✅',
@@ -167,7 +180,7 @@ function buildAllInsights(
     );
   }
 
-  // 7. Faixa 31-60d — higher = alert
+  // 8. Faixa 31-60d — higher = alert
   if (exceedsPct(ult.dias31_60, med.dias31_60, 8)) {
     const diff = ult.dias31_60 - med.dias31_60;
     push(diff > 0, diff > 0 ? '⚠️' : '✅',
@@ -176,7 +189,7 @@ function buildAllInsights(
     );
   }
 
-  // 8. Faixa 0-30d — higher = alert (more fresh conclusos = more incoming work)
+  // 9. Faixa 0-30d — higher = alert (more fresh conclusos = more incoming work)
   if (exceedsPct(ult.dias0_30, med.dias0_30, 5)) {
     const diff = ult.dias0_30 - med.dias0_30;
     push(diff > 0, diff > 0 ? '⚠️' : '✅',
@@ -187,7 +200,7 @@ function buildAllInsights(
     );
   }
 
-  // 9. Complexidade (mediaEventos) — higher = alert
+  // 10. Complexidade (mediaEventos) — higher = alert
   if (exceedsPct(ult.mediaEventos, med.mediaEventos, 5)) {
     const p = fmtPct(ult.mediaEventos, med.mediaEventos);
     const diff = ult.mediaEventos - med.mediaEventos;
@@ -199,7 +212,7 @@ function buildAllInsights(
     );
   }
 
-  // 10. Sentenças — lower = good (fewer awaiting sentence = better)
+  // 11. Sentenças — lower = good (fewer awaiting sentence = better)
   if (exceedsPct(ult.sentenca, med.sentenca, 8)) {
     const p = fmtPct(ult.sentenca, med.sentenca);
     const diff = ult.sentenca - med.sentenca;
@@ -211,7 +224,7 @@ function buildAllInsights(
     );
   }
 
-  // 11. Despachos — lower = good
+  // 12. Despachos — lower = good
   if (exceedsPct(ult.despacho, med.despacho, 8)) {
     const p = fmtPct(ult.despacho, med.despacho);
     const diff = ult.despacho - med.despacho;
@@ -223,7 +236,7 @@ function buildAllInsights(
     );
   }
 
-  // 12. Decisões — lower = good
+  // 13. Decisões — lower = good
   if (exceedsPct(ult.decisao, med.decisao, 8)) {
     const p = fmtPct(ult.decisao, med.decisao);
     const diff = ult.decisao - med.decisao;
@@ -235,7 +248,7 @@ function buildAllInsights(
     );
   }
 
-  // 13. Comparação com snapshot anterior
+  // 14. Comparação com snapshot anterior
   if (ant) {
     const diff = ult.conclusos - ant.conclusos;
     if (diff !== 0) {
