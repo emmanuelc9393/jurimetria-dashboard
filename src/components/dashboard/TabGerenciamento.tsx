@@ -12,6 +12,9 @@ import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { loginAction, saveRelatorioData, saveJurimetriaData, saveHistoricoData, saveComparativoData } from '@/app/actions';
 import { Lock } from 'lucide-react';
+import {
+  CAMPOS_RITMO, formatarRitmo, parseMarkdownHistorico, snapshotParaSalvar, type HistoricoSnapshot,
+} from '@/lib/historicoParser';
 
 // ─── Constants (shared with TabRelatorioPadrao) ───────────────────────────────
 
@@ -55,31 +58,6 @@ interface Processo {
   [key: string]: string | number | undefined;
 }
 
-interface HistoricoSnapshot {
-  dataHora: string;
-  isMediaHistorica: boolean;
-  conclusos: number;
-  mediaDias: number;
-  mediaEventos: number;
-  decisao: number;
-  despacho: number;
-  sentenca: number;
-  conhecimento: number;
-  execucao: number;
-  outros: number;
-  dias0_30: number;
-  dias31_60: number;
-  dias61_90: number;
-  dias91_120: number;
-  dias121plus: number;
-  eventos0_20: number;
-  eventos21_50: number;
-  eventos51_100: number;
-  eventos101_200: number;
-  eventos201plus: number;
-}
-
-
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 export function TabGerenciamento({ onDataSaved }: { onDataSaved: () => void }) {
@@ -98,6 +76,7 @@ export function TabGerenciamento({ onDataSaved }: { onDataSaved: () => void }) {
   // ── Histórico state ──
   const [historicoPastedData, setHistoricoPastedData] = useState('');
   const [historico, setHistorico] = useState<HistoricoSnapshot[]>([]);
+  const [historicoTemRitmo, setHistoricoTemRitmo] = useState(false);
 
   // ── Comparativo state ──
   const [comparativoPastedData, setComparativoPastedData] = useState('');
@@ -324,93 +303,32 @@ export function TabGerenciamento({ onDataSaved }: { onDataSaved: () => void }) {
 
   // ── Histórico handlers ────────────────────────────────────────────────────
 
-  const parseMarkdownHistorico = (markdown: string): HistoricoSnapshot[] => {
-    const lines = markdown.split('\n')
-      .map(l => l.trim())
-      .filter(l => l.startsWith('|') && !l.match(/^\|\s*-{3}/));
-
-    // lines[0] = cabeçalho de grupos, lines[1] = cabeçalho de colunas, lines[2+] = dados
-    if (lines.length < 3) return [];
-
-    // A "Faixa de Dias" pode vir com 4 colunas (0-30d..91-120d, formato antigo)
-    // ou 5 colunas (incluindo 121+d, formato atual do eProc). Detectamos pelo
-    // cabeçalho de colunas para manter compatibilidade com colagens antigas.
-    const headerCells = lines[1].split('|').map(c => c.trim()).filter(Boolean);
-    const has121Column = headerCells.some(c => c.replace(/\s/g, '') === '121+d');
-    const eventosOffset = has121Column ? 16 : 15;
-
-    const snapshots: HistoricoSnapshot[] = [];
-    for (let i = 2; i < lines.length; i++) {
-      const cells = lines[i].split('|').map(c => c.trim()).filter(Boolean);
-      if (cells.length < 3) continue;
-      const dataHora = cells[1] || '';
-      if (!dataHora) continue;
-      const clean = (idx: number) => String(cells[idx] || '').replace(/[^0-9.-]/g, '');
-      const n = (idx: number) => Number(clean(idx)) || 0;
-      const f = (idx: number) => parseFloat(clean(idx)) || 0;
-      snapshots.push({
-        dataHora,
-        isMediaHistorica: dataHora.toUpperCase().includes('MÉDIA'),
-        conclusos: n(2),
-        mediaDias: f(3),
-        mediaEventos: f(4),
-        decisao: n(5),
-        despacho: n(6),
-        sentenca: n(7),
-        conhecimento: n(8),
-        execucao: n(9),
-        outros: n(10),
-        dias0_30: n(11),
-        dias31_60: n(12),
-        dias61_90: n(13),
-        dias91_120: n(14),
-        dias121plus: has121Column ? n(15) : 0,
-        eventos0_20: n(eventosOffset),
-        eventos21_50: n(eventosOffset + 1),
-        eventos51_100: n(eventosOffset + 2),
-        eventos101_200: n(eventosOffset + 3),
-        eventos201plus: n(eventosOffset + 4),
-      });
-    }
-    return snapshots;
-  };
-
   const handleProcessHistorico = () => {
     if (!historicoPastedData.trim()) { toast.warning('Cole os dados do histórico primeiro.'); return; }
-    const parsed = parseMarkdownHistorico(historicoPastedData);
-    if (parsed.length === 0) {
+    const { snapshots, temRitmo, visaoPorMes } = parseMarkdownHistorico(historicoPastedData);
+    if (snapshots.length === 0) {
+      setHistoricoTemRitmo(false);
       toast.error('Nenhum dado reconhecido. Verifique o formato da tabela markdown.');
       return;
     }
-    setHistorico(parsed);
-    toast.success(`${parsed.length} snapshots processados (incluindo média histórica se presente).`);
+    setHistorico(snapshots);
+    setHistoricoTemRitmo(temRitmo);
+    const comRitmo = snapshots.filter(s => !s.isMediaHistorica && s.tempoDecidir !== null).length;
+    toast.success(`${snapshots.length} snapshots processados (incluindo média histórica se presente).`, {
+      description: temRitmo
+        ? `Ritmo de Conclusão reconhecido: ${comRitmo} run(s) com as métricas de tempo preenchidas.`
+        : 'Tabela sem o grupo Ritmo de Conclusão (formato anterior do eProc).',
+    });
+    if (visaoPorMes) {
+      toast.warning('Tabela da visão "Exibir por mês" do eProc.', {
+        description: 'Cada mês foi registrado com a data/hora da sua última run. Para o histórico completo, copie com a visão por run.',
+      });
+    }
   };
 
   const handleSaveHistorico = async () => {
     if (historico.length === 0) { toast.warning('Nenhum dado de histórico para salvar.'); return; }
-    const dadosParaSalvar = historico.map(s => ({
-      dataHora: s.dataHora,
-      isMediaHistorica: s.isMediaHistorica ? 1 : 0,
-      conclusos: s.conclusos,
-      mediaDias: s.mediaDias,
-      mediaEventos: s.mediaEventos,
-      decisao: s.decisao,
-      despacho: s.despacho,
-      sentenca: s.sentenca,
-      conhecimento: s.conhecimento,
-      execucao: s.execucao,
-      outros: s.outros,
-      dias0_30: s.dias0_30,
-      dias31_60: s.dias31_60,
-      dias61_90: s.dias61_90,
-      dias91_120: s.dias91_120,
-      dias121plus: s.dias121plus,
-      eventos0_20: s.eventos0_20,
-      eventos21_50: s.eventos21_50,
-      eventos51_100: s.eventos51_100,
-      eventos101_200: s.eventos101_200,
-      eventos201plus: s.eventos201plus,
-    }));
+    const dadosParaSalvar = historico.map(snapshotParaSalvar);
     const result = await saveHistoricoData(dadosParaSalvar);
     if (result.success) {
       toast.success('Histórico de snapshots salvo!');
@@ -586,7 +504,7 @@ export function TabGerenciamento({ onDataSaved }: { onDataSaved: () => void }) {
         <CardHeader>
           <CardTitle>📈 Entrada de Dados — Histórico de Snapshots</CardTitle>
           <CardDescription>
-            Cole abaixo a tabela markdown exportada do eProc (formato com cabeçalho duplo). Cada linha representa uma observação diária dos processos conclusos. Aceita tanto o formato antigo da Faixa de Dias (0-30d a 91-120d) quanto o atual, com a coluna adicional 121+d.
+            Cole abaixo a tabela markdown exportada do eProc (formato com cabeçalho duplo). Cada linha representa uma observação diária dos processos conclusos. As colunas são reconhecidas pelo nome do cabeçalho: aceita o formato antigo da Faixa de Dias (0-30d a 91-120d), o formato com 121+d e o atual, com o grupo Ritmo de Conclusão (Decidir, Concl./ano, Cartório, Eventos/30d, Novos conclusos e conclusões/petições do mês pelo relatório do e-Proc).
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -626,6 +544,11 @@ export function TabGerenciamento({ onDataSaved }: { onDataSaved: () => void }) {
                       <th className="px-2 py-1 text-right">61-90d</th>
                       <th className="px-2 py-1 text-right">91-120d</th>
                       <th className="px-2 py-1 text-right">121+d</th>
+                      {historicoTemRitmo && CAMPOS_RITMO.map(c => (
+                        <th key={c.campo} title={c.descricao} className="px-2 py-1 text-right whitespace-nowrap bg-violet-50">
+                          {c.cabecalho}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
@@ -644,6 +567,15 @@ export function TabGerenciamento({ onDataSaved }: { onDataSaved: () => void }) {
                         <td className="px-2 py-1 text-right">{s.dias61_90}</td>
                         <td className="px-2 py-1 text-right">{s.dias91_120}</td>
                         <td className="px-2 py-1 text-right">{s.dias121plus}</td>
+                        {historicoTemRitmo && CAMPOS_RITMO.map(c => {
+                          const valor = s[c.campo];
+                          const emAndamento = valor === null && s.mesEmAndamento && c.campo.endsWith('Cheio');
+                          return (
+                            <td key={c.campo} className={`px-2 py-1 text-right whitespace-nowrap ${valor === null ? 'text-gray-400' : ''} ${emAndamento ? 'italic' : ''}`}>
+                              {emAndamento ? 'em andamento' : formatarRitmo(valor, c.casas)}
+                            </td>
+                          );
+                        })}
                       </tr>
                     ))}
                   </tbody>
